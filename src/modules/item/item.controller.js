@@ -14,12 +14,13 @@ export const createItem = asyncWrapper(async (req, res) => {
 });
 
 export const getItems = asyncWrapper(async (req, res) => {
-  const items = await itemService.getItems(req.query);
+  const result = await itemService.getItems(req.query);
 
   return successResponse({
     res,
     message: "Items fetched successfully",
-    data: items,
+    data: result.items,
+    meta: result.meta,
   });
 });
 

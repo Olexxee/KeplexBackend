@@ -4,6 +4,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 
+import { handlePaystackWebhook } from "./modules/payments/paystackWebhook.controller.js";
+import dashboardRouter from "./modules/dashboard/dashboard.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import itemRouter from "./modules/item/item.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
@@ -15,6 +17,12 @@ import { NotFoundError } from "./classes/errorClasses.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 
 export const app = express();
+
+app.post(
+  "/api/payments/webhooks/paystack",
+  express.raw({ type: "application/json" }),
+  handlePaystackWebhook,
+);
 
 app.use(
   cors({
@@ -42,6 +50,7 @@ app.use("/api/category", categoryRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/items", itemRouter);
 app.use("/api/orders", orderRouter);
+app.use("/api/dashboard", dashboardRouter);
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
 });

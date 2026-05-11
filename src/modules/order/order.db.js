@@ -152,3 +152,31 @@ export const decrementItemStock = async ({ itemId, quantity }, tx = prisma) => {
     },
   });
 };
+
+export const restoreOrderItemStock = async (
+  { itemId, quantity },
+  tx = prisma,
+) => {
+  return tx.item.update({
+    where: { id: itemId },
+    data: {
+      stock: {
+        increment: quantity,
+      },
+    },
+  });
+};
+
+export const updateOrderStatusTx = async (id, data, tx = prisma) => {
+  return tx.order.update({
+    where: { id },
+    data,
+    include: {
+      items: {
+        include: {
+          item: true,
+        },
+      },
+    },
+  });
+};

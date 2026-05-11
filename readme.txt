@@ -27,3 +27,18 @@ errorClasses.js
 asyncWrapper.js
 errorMiddleware.js
 response.js
+
+// Things still needed to be done
+pagination
+rate limiting
+query sanitization
+helmet tuning
+request logging
+input normalization
+
+1. Payment integration
+2. Inventory restoration rules
+3. Admin analytics/dashboard
+4. Notification queue
+5. Public storefront APIs
+6. Frontend integration

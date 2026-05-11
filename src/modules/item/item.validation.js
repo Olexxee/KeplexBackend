@@ -33,3 +33,12 @@ export const updateItemSchema = createItemSchema
 export const itemIdSchema = Joi.object({
   id: Joi.string().required(),
 });
+
+export const getItemsQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  categoryId: Joi.string().optional(),
+  status: Joi.string().valid("DRAFT", "ACTIVE", "ARCHIVED").optional(),
+  itemType: Joi.string().valid("PRODUCT", "SERVICE", "PACKAGE").optional(),
+  search: Joi.string().trim().max(100).optional(),
+});

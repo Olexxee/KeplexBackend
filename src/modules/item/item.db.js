@@ -69,40 +69,40 @@ export const findItemBySku = async (sku) => {
   });
 };
 
-export const findItems = async ({ categoryId, status, itemType, search }) => {
-  return prisma.item.findMany({
-    where: {
-      ...(categoryId && { categoryId }),
+export const findItems = async ({
+  categoryId,
+  status,
+  itemType,
+  search,
+  page,
+  limit,
+  skip,
+}) => {
+  const where = {
+    ...(categoryId && { categoryId }),
+    ...(status && { status }),
+    ...(itemType && { itemType }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ],
+    }),
+  };
 
-      ...(status && { status }),
+  const [items, total] = await Promise.all([
+    prisma.item.findMany({
+      where,
+      include: itemInclude,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    }),
 
-      ...(itemType && { itemType }),
+    prisma.item.count({ where }),
+  ]);
 
-      ...(search && {
-        OR: [
-          {
-            name: {
-              contains: search,
-              mode: "insensitive",
-            },
-          },
-
-          {
-            description: {
-              contains: search,
-              mode: "insensitive",
-            },
-          },
-        ],
-      }),
-    },
-
-    include: itemInclude,
-
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  return { items, total };
 };
 
 export const updateItem = async (id, data) => {

@@ -195,6 +195,7 @@ model Order {
   totalAmount   Decimal     @db.Decimal(12, 2)
   status        OrderStatus @default(PENDING)
   notes         String?
+  payments Payment[]
 
   user  User?       @relation(fields: [userId], references: [id])
   items OrderItem[]
@@ -234,4 +235,33 @@ model AuditLog {
 
   @@index([userId])
   @@index([entity])
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  ABANDONED
+  REVERSED
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  provider        String        @default("PAYSTACK")
+  reference       String        @unique
+  amount          Decimal       @db.Decimal(12, 2)
+  currency        String        @default("NGN")
+  status          PaymentStatus @default(PENDING)
+  authorizationUrl String?
+  accessCode      String?
+  providerPayload Json?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([reference])
 }

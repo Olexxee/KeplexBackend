@@ -105,19 +105,55 @@ export const getOrderById = async (id, user) => {
 };
 
 export const updateOrderStatus = async (id, status) => {
-  const order = await orderDb.findOrderById(id);
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            item: true,
+          },
+        },
+      },
+    });
 
-  if (!order) {
-    throw new NotFoundError("Order not found");
-  }
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
 
-  if (order.status === "COMPLETED" && status !== "COMPLETED") {
-    throw new BadRequestError("Completed orders cannot be moved backwards");
-  }
+    if (order.status === "COMPLETED" && status !== "COMPLETED") {
+      throw new BadRequestError("Completed orders cannot be moved backwards");
+    }
 
-  if (order.status === "CANCELLED" && status !== "CANCELLED") {
-    throw new BadRequestError("Cancelled orders cannot be changed");
-  }
+    if (order.status === "CANCELLED" && status !== "CANCELLED") {
+      throw new BadRequestError("Cancelled orders cannot be changed");
+    }
 
-  return orderDb.updateOrderStatus(id, status);
+    const shouldRestoreStock = status === "CANCELLED" && !order.stockRestoredAt;
+
+    if (shouldRestoreStock) {
+      for (const orderItem of order.items) {
+        if (orderItem.item.itemType === "PRODUCT") {
+          await orderDb.restoreOrderItemStock(
+            {
+              itemId: orderItem.itemId,
+              quantity: orderItem.quantity,
+            },
+            tx,
+          );
+        }
+      }
+    }
+
+    return orderDb.updateOrderStatusTx(
+      id,
+      {
+        status,
+        ...(shouldRestoreStock && {
+          stockRestoredAt: new Date(),
+        }),
+      },
+      tx,
+    );
+  });
 };

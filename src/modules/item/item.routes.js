@@ -8,16 +8,23 @@ import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 import { uploadItemImages } from "../../middlewares/uploadMiddleware.js";
 import { processItemImages } from "../../middlewares/processItemImages.js";
+import {parseMultipartJsonFields} from "../../middlewares/parseMultipartJson.js";
 import * as itemController from "./item.controller.js";
 import {
   createItemSchema,
   updateItemSchema,
   itemIdSchema,
+  getItemsQuerySchema,
 } from "./item.validation.js";
 
 const itemRouter = Router();
 
-itemRouter.get("/", itemController.getItems);
+itemRouter.get(
+  "/",
+  validateQuery(getItemsQuerySchema),
+  itemController.getItems,
+);
+
 itemRouter.get(
   "/:id",
   validateParams(itemIdSchema),
@@ -30,6 +37,7 @@ itemRouter.post(
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   uploadItemImages,
   processItemImages,
+  parseMultipartJsonFields(["features", "specifications"]),
   validateBody(createItemSchema),
   itemController.createItem,
 );
@@ -41,6 +49,7 @@ itemRouter.patch(
   validateParams(itemIdSchema),
   uploadItemImages,
   processItemImages,
+  parseMultipartJsonFields(["features", "specifications"]),
   validateBody(updateItemSchema),
   itemController.updateItem,
 );
