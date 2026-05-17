@@ -16,7 +16,13 @@ const validate = (schema, source) => {
       return next(new ValidationError("Validation failed", details));
     }
 
-    req[source] = value;
+    if (source === "body") {
+      req.body = value;
+    } else {
+      if (!req.validated) req.validated = {};
+      req.validated[source] = value;
+    }
+
     next();
   };
 };

@@ -1,20 +1,18 @@
 import { Worker } from "bullmq";
 import { redisConnection } from "../config/redis.js";
-import * as notificationService from "../modules/notifications/notification.service.js";
+import { notificationHandlers } from "../modules/notifications/notification.handlers.js";
+import {QUEUE_NAMES} from "../queues/notification.queue.js";
 
 export const notificationWorker = new Worker(
-  "notificationQueue",
+  QUEUE_NAMES.NOTIFICATION,
   async (job) => {
-    switch (job.name) {
-      case "ORDER_CONFIRMED":
-        return notificationService.sendOrderConfirmedEmail(job.data);
+    const handler = notificationHandlers[job.name];
 
-      case "ORDER_STATUS_UPDATED":
-        return notificationService.sendOrderStatusEmail(job.data);
-
-      default:
-        throw new Error(`Unknown notification job: ${job.name}`);
+    if (!handler) {
+      throw new Error(`Unknown notification job: ${job.name}`);
     }
+
+    return handler(job.data);
   },
   {
     connection: redisConnection,

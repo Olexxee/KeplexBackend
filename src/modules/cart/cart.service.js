@@ -1,7 +1,7 @@
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
 
 import * as cartDb from "./cart.db.js";
-import * as itemDb from "../items/item.db.js";
+import * as itemDb from "../item/item.db.js";
 
 const toNumber = (value) => Number(value);
 

@@ -4,25 +4,24 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 
-import { handlePaystackWebhook } from "./modules/payments/paystackWebhook.controller.js";
+import { handlePaystackWebhook } from "./modules/payment/paystackWebhook.controller.js";
 import dashboardRouter from "./modules/dashboard/dashboard.routes.js";
+import paymentRouter from "./modules/payment/payment.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import itemRouter from "./modules/item/item.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
 import categoryRouter from "./modules/categories/category.routes.js";
 import orderRouter from "./modules/order/order.routes.js";
+import testimonialRouter from "./modules/testimonials/testimonialRoutes.js";
 import authRouter from "./modules/auth/auth.routes.js";
+import registrationRouter from "./modules/registration/registration.routes.js";
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 
 export const app = express();
 
-app.post(
-  "/api/payments/webhooks/paystack",
-  express.raw({ type: "application/json" }),
-  handlePaystackWebhook,
-);
+app.use("/api/payments", handlePaystackWebhook);
 
 app.use(
   cors({
@@ -44,13 +43,17 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use("/api/auth", authRouter);
-app.use("/api/organisation", organisationRouter);
-app.use("/api/category", categoryRouter);
+
+app.use("/api/auth", authRouter); // Already works
+app.use("/api/organisation", organisationRouter); // Already works
+app.use("/api/category", categoryRouter); // Working
 app.use("/api/cart", cartRouter);
-app.use("/api/items", itemRouter);
-app.use("/api/orders", orderRouter);
-app.use("/api/dashboard", dashboardRouter);
+app.use("/api/items", itemRouter); // Working
+app.use("/api/orders", orderRouter); // Working
+app.use("/api/payments", paymentRouter);
+app.use("/api/dashboard", dashboardRouter); //Working
+app.use("/api/registrations", registrationRouter);
+app.use("/api/testimonials", testimonialRouter); 
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
 });

@@ -13,15 +13,17 @@ export const createCategory = asyncWrapper(async (req, res) => {
   });
 });
 
-export const getCategories = asyncWrapper(async (req, res) => {
-  const categories = await categoryService.getCategories(req.query);
 
-  return successResponse({
-    res,
-    message: "Categories fetched successfully",
-    data: categories,
-  });
-});
+ export const getCategories = asyncWrapper(async (req, res) => {
+   const result = await categoryService.getCategories(req.query);
+
+   return successResponse({
+     res,
+     message: "Categories fetched successfully",
+     data: result.data,
+     meta: result.pagination,
+   });
+ });
 
 export const updateCategory = asyncWrapper(async (req, res) => {
   const category = await categoryService.updateCategory(

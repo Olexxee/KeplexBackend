@@ -1,15 +1,13 @@
 import { v2 as cloudinary } from "cloudinary";
-import configService from "../lib/classes/configClass.js";
-import logger from "../lib/logger.js";
+import { env } from "./env.js"; 
 
 cloudinary.config({
-  cloud_name: configService.getOrThrow("CLOUDINARY_CLOUD_NAME"),
-  api_key: configService.getOrThrow("CLOUDINARY_API_KEY"),
-  api_secret: configService.getOrThrow("CLOUDINARY_API_SECRET"),
+  cloud_name: env.cloudinary.cloudName,
+  api_key: env.cloudinary.apiKey,
+  api_secret: env.cloudinary.apiSecret,
 });
 
-console.log(cloudinary.config().cloud_name);
-
-logger.info("☁️ Cloudinary initialized");
+// Using your logger instead of console.log for better practice
+console.info(`☁️ Cloudinary initialized for: ${cloudinary.config().cloud_name}`);
 
 export default cloudinary;

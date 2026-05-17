@@ -16,12 +16,20 @@ export const findCategoryBySlug = async (slug) => {
   });
 };
 
-export const findCategories = async ({ type, isActive } = {}) => {
-  return prisma.category.findMany({
-    where: {
-      ...(type && { type }),
-      ...(typeof isActive === "boolean" && { isActive }),
-    },
+export const findCategories = async ({
+  type,
+  isActive,
+  skip = 0,
+  take = 10,
+} = {}) => {
+  const where = {
+    ...(type && { type }),
+    ...(typeof isActive === "boolean" && { isActive }),
+  };
+
+  const queryOptions = {
+    where,
+
     include: {
       parent: {
         select: {
@@ -30,6 +38,7 @@ export const findCategories = async ({ type, isActive } = {}) => {
           slug: true,
         },
       },
+
       children: {
         select: {
           id: true,
@@ -39,16 +48,38 @@ export const findCategories = async ({ type, isActive } = {}) => {
           isActive: true,
           sortOrder: true,
         },
-        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        orderBy: [
+          { sortOrder: "asc" },
+          { name: "asc" },
+        ],
       },
+
       _count: {
         select: {
           items: true,
         },
       },
     },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-  });
+
+    orderBy: [
+      { sortOrder: "asc" },
+      { name: "asc" },
+    ],
+
+    skip,
+    take,
+  };
+
+  const [categories, total] = await Promise.all([
+    prisma.category.findMany(queryOptions),
+
+    prisma.category.count({ where }),
+  ]);
+
+  return {
+    categories,
+    total,
+  };
 };
 
 export const updateCategory = async (id, data) => {

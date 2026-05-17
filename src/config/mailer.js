@@ -1,12 +1,16 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { env } from "./env.js";
 
-export const mailer = nodemailer.createTransport({
-  host: env.email.host,
-  port: env.email.port,
-  secure: env.email.port === 465,
-  auth: {
-    user: env.email.user,
-    pass: env.email.pass,
-  },
-});
+const resend = new Resend(env.email.resendApiKey);
+
+export const sendEmail = async ({ to, subject, html, text }) => {
+  if (!to) return;
+
+  return resend.emails.send({
+    from: env.email.from,
+    to,
+    subject,
+    html,
+    text,
+  });
+};

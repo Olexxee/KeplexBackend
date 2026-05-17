@@ -23,3 +23,11 @@ export const updateCategorySchema = Joi.object({
 export const categoryIdSchema = Joi.object({
   id: Joi.string().required(),
 });
+
+export const getCategoriesQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  parentId: Joi.string().allow(null).optional(),
+  status: Joi.string().valid("ACTIVE", "INACTIVE").optional(),
+  search: Joi.string().trim().max(100).optional(),
+});

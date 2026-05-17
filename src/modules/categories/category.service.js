@@ -4,6 +4,10 @@ import {
   NotFoundError,
 } from "../../classes/errorClasses.js";
 import * as categoryDb from "./category.db.js";
+import {
+  getPaginationParams,
+  formatPaginatedResponse,
+} from "../../lib/pagination.js";
 
 const normalizePayload = (payload) => ({
   ...payload,
@@ -43,7 +47,17 @@ export const createCategory = async (payload) => {
 };
 
 export const getCategories = async (filters) => {
-  return categoryDb.findCategories(filters);
+  const { page, limit, ...rest } = filters;
+
+  const { skip, take } = getPaginationParams(page, limit);
+
+ const { categories, total } = await categoryDb.findCategories({
+   ...rest,
+   skip,
+   take,
+ });
+
+  return formatPaginatedResponse({ data: categories, total, page, limit });
 };
 
 export const updateCategory = async (id, payload) => {

@@ -1,7 +1,12 @@
 import { Queue } from "bullmq";
 import { redisConnection } from "../config/redis.js";
 
-export const notificationQueue = new Queue("notificationQueue", {
+
+export const QUEUE_NAMES = {
+  NOTIFICATION: "keplex_notification_queue",
+};
+
+export const notificationQueue = new Queue(QUEUE_NAMES.NOTIFICATION, {
   connection: redisConnection,
 });
 

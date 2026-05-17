@@ -1,14 +1,10 @@
 import { Router } from "express";
-
-import {
-  validateBody,
-  validateParams,
-} from "../../middlewares/validateMiddleware.js";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 import { uploadItemImages } from "../../middlewares/uploadMiddleware.js";
 import { processItemImages } from "../../middlewares/processItemImages.js";
-import {parseMultipartJsonFields} from "../../middlewares/parseMultipartJson.js";
+import { parseMultipartJsonFields } from "../../middlewares/parseMultipartJson.js";
+import {validateQuery, validateBody, validateParams} from "../../middlewares/validateMiddleware.js";
 import * as itemController from "./item.controller.js";
 import {
   createItemSchema,

@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   validateBody,
   validateParams,
+  validateQuery,
 } from "../../middlewares/validateMiddleware.js";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
@@ -11,11 +12,16 @@ import {
   createCategorySchema,
   updateCategorySchema,
   categoryIdSchema,
+  getCategoriesQuerySchema,
 } from "./category.validation.js";
 
 const categoryRouter = Router();
 
-categoryRouter.get("/", categoryController.getCategories);
+categoryRouter.get(
+  "/",
+  validateQuery(getCategoriesQuerySchema),
+  categoryController.getCategories,
+);
 
 categoryRouter.post(
   "/",

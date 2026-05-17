@@ -1,5 +1,8 @@
 import { prisma } from "../../config/prisma.js";
 
+/**
+ * CART
+ */
 export const findActiveCartForCheckout = async (userId, tx = prisma) => {
   return tx.cart.findFirst({
     where: {
@@ -16,6 +19,9 @@ export const findActiveCartForCheckout = async (userId, tx = prisma) => {
   });
 };
 
+/**
+ * ORDER CREATE
+ */
 export const createOrderFromCart = async (
   { userId, payload, cart, totalAmount },
   tx = prisma,
@@ -32,13 +38,12 @@ export const createOrderFromCart = async (
       items: {
         create: cart.items.map((cartItem) => {
           const unitPrice = cartItem.unitPriceSnapshot;
-          const totalPrice = Number(unitPrice) * cartItem.quantity;
 
           return {
             itemId: cartItem.itemId,
             quantity: cartItem.quantity,
             unitPriceSnapshot: unitPrice,
-            totalPrice,
+            totalPrice: Number(unitPrice) * cartItem.quantity,
           };
         }),
       },
@@ -51,7 +56,7 @@ export const createOrderFromCart = async (
               id: true,
               name: true,
               slug: true,
-              images: true,
+              media: true,
             },
           },
         },
@@ -60,6 +65,9 @@ export const createOrderFromCart = async (
   });
 };
 
+/**
+ * CART STATUS UPDATE
+ */
 export const markCartAsCheckedOut = async (cartId, tx = prisma) => {
   return tx.cart.update({
     where: { id: cartId },
@@ -67,6 +75,9 @@ export const markCartAsCheckedOut = async (cartId, tx = prisma) => {
   });
 };
 
+/**
+ * ORDERS LIST
+ */
 export const findOrders = async ({ status, userId } = {}) => {
   return prisma.order.findMany({
     where: {
@@ -81,7 +92,7 @@ export const findOrders = async ({ status, userId } = {}) => {
               id: true,
               name: true,
               slug: true,
-              images: true,
+              media: true,
             },
           },
         },
@@ -95,10 +106,15 @@ export const findOrders = async ({ status, userId } = {}) => {
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: {
+      createdAt: "desc",
+    },
   });
 };
 
+/**
+ * SINGLE ORDER
+ */
 export const findOrderById = async (id) => {
   return prisma.order.findUnique({
     where: { id },
@@ -110,7 +126,7 @@ export const findOrderById = async (id) => {
               id: true,
               name: true,
               slug: true,
-              images: true,
+              media: true,
             },
           },
         },
@@ -127,6 +143,9 @@ export const findOrderById = async (id) => {
   });
 };
 
+/**
+ * ORDER STATUS
+ */
 export const updateOrderStatus = async (id, status) => {
   return prisma.order.update({
     where: { id },
@@ -137,7 +156,13 @@ export const updateOrderStatus = async (id, status) => {
   });
 };
 
-export const decrementItemStock = async ({ itemId, quantity }, tx = prisma) => {
+/**
+ * STOCK OPERATIONS
+ */
+export const decrementItemStock = async (
+  { itemId, quantity },
+  tx = prisma,
+) => {
   return tx.item.updateMany({
     where: {
       id: itemId,
@@ -167,6 +192,9 @@ export const restoreOrderItemStock = async (
   });
 };
 
+/**
+ * TRANSACTIONAL ORDER UPDATE
+ */
 export const updateOrderStatusTx = async (id, data, tx = prisma) => {
   return tx.order.update({
     where: { id },

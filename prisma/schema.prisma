@@ -7,6 +7,228 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        String     @id @default(cuid())
+  fullName  String
+  email     String     @unique
+  phone     String?
+  password  String
+  role      UserRole   @default(CUSTOMER)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  auditLogs AuditLog[]
+  carts     Cart[]
+  orders    Order[]
+}
+
+model Organisation {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  email       String?
+  phone       String?
+  logoUrl     String?
+  address     String?
+  socialLinks Json?
+  settings    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String?
+  type        CategoryType @default(PRODUCT)
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  parentId    String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  parent      Category?    @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    Category[]   @relation("CategoryChildren")
+  items       Item[]
+}
+
+model Item {
+  id             String      @id @default(cuid())
+  categoryId     String
+  name           String
+  slug           String      @unique
+  description    String?
+  price          Decimal     @db.Decimal(12, 2)
+  compareAtPrice Decimal?    @db.Decimal(12, 2)
+  sku            String?     @unique
+  stock          Int         @default(0)
+  itemType       ItemType    @default(PRODUCT)
+  status         ItemStatus  @default(DRAFT)
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  cartItems      CartItem[]
+  category       Category    @relation(fields: [categoryId], references: [id])
+  media          Media[]
+  orderItems     OrderItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([itemType])
+}
+
+model TrainingRegistration {
+  id               String             @id @default(cuid())
+  fullName         String
+  email            String
+  phone            String
+  amount           Decimal            @db.Decimal(12, 2)
+  currency         String             @default("NGN")
+  status           RegistrationStatus @default(PENDING)
+  paymentRef       String?            @unique
+  authorizationUrl String?
+  accessCode       String?
+  provider         String             @default("PAYSTACK")
+  providerPayload  Json?
+  paidAt           DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  itemId    String?
+  url       String
+  publicId  String   @unique
+  mimeType  String?
+  width     Int?
+  height    Int?
+  bytes     Int?
+  format    String?
+  alt       String?
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@index([publicId])
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String?
+  sessionId String?
+  status    CartStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User?      @relation(fields: [userId], references: [id])
+  items     CartItem[]
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model CartItem {
+  id                String   @id @default(cuid())
+  cartId            String
+  itemId            String
+  quantity          Int
+  unitPriceSnapshot Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  cart              Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  item              Item     @relation(fields: [itemId], references: [id])
+
+  @@unique([cartId, itemId])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  userId        String?
+  customerName  String
+  customerEmail String?
+  customerPhone String?
+  totalAmount   Decimal     @db.Decimal(12, 2)
+  status        OrderStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User?       @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  payments      Payment[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id                String   @id @default(cuid())
+  orderId           String
+  itemId            String
+  quantity          Int
+  unitPriceSnapshot Decimal  @db.Decimal(12, 2)
+  totalPrice        Decimal  @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+  item              Item     @relation(fields: [itemId], references: [id])
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  orderId          String
+  provider         String        @default("PAYSTACK")
+  reference        String        @unique
+  amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("NGN")
+  status           PaymentStatus @default(PENDING)
+  authorizationUrl String?
+  accessCode       String?
+  providerPayload  Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([reference])
+}
+
+model Testimonial {
+  id        String            @id @default(cuid())
+  name      String
+  role      String?
+  message   String
+  rating    Int               @default(5)
+  imageUrl  String?
+  status    TestimonialStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 enum UserRole {
   SUPER_ADMIN
   ADMIN
@@ -51,190 +273,11 @@ enum OrderStatus {
   CANCELLED
 }
 
-model User {
-  id        String     @id @default(cuid())
-  fullName  String
-  email     String     @unique
-  phone     String?
-  password  String
-  role      UserRole   @default(CUSTOMER)
-  status    UserStatus @default(ACTIVE)
-
-  carts     Cart[]
-  orders    Order[]
-  auditLogs AuditLog[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Organisation {
-  id          String  @id @default(cuid())
-  name        String
-  slug        String  @unique
-  email       String?
-  phone       String?
-  logoUrl     String?
-  address     String?
-  socialLinks Json?
-  settings    Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Category {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String       @unique
-  description String?
-  type        CategoryType @default(PRODUCT)
-  isActive    Boolean      @default(true)
-  sortOrder   Int          @default(0)
-
-  parentId String?
-  parent   Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryChildren")
-
-  items Item[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Item {
-  id             String     @id @default(cuid())
-  categoryId     String
-  name           String
-  slug           String     @unique
-  description    String?
-  price          Decimal    @db.Decimal(12, 2)
-  compareAtPrice Decimal?   @db.Decimal(12, 2)
-  sku            String?    @unique
-  stock          Int        @default(0)
-  itemType       ItemType   @default(PRODUCT)
-  status         ItemStatus @default(DRAFT)
-  media Media[]
-  metadata       Json?
-
-  category   Category    @relation(fields: [categoryId], references: [id])
-  cartItems  CartItem[]
-  orderItems OrderItem[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([categoryId])
-  @@index([status])
-  @@index([itemType])
-}
-
-model Media {
-  id        String   @id @default(cuid())
-
-  itemId    String?
-  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-
-  url       String
-  publicId  String   @unique
-  mimeType  String?
-  width     Int?
-  height    Int?
-  bytes     Int?
-  format    String?
-
-  alt       String?
-  isPrimary Boolean  @default(false)
-  sortOrder Int      @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([itemId])
-  @@index([publicId])
-}
-
-model Cart {
-  id        String     @id @default(cuid())
-  userId    String?
-  sessionId String?
-  status    CartStatus @default(ACTIVE)
-
-  user  User?      @relation(fields: [userId], references: [id])
-  items CartItem[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([sessionId])
-}
-
-model CartItem {
-  id                String  @id @default(cuid())
-  cartId            String
-  itemId            String
-  quantity          Int
-  unitPriceSnapshot Decimal @db.Decimal(12, 2)
-
-  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  item Item @relation(fields: [itemId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([cartId, itemId])
-}
-
-model Order {
-  id            String      @id @default(cuid())
-  userId        String?
-  customerName  String
-  customerEmail String?
-  customerPhone String?
-  totalAmount   Decimal     @db.Decimal(12, 2)
-  status        OrderStatus @default(PENDING)
-  notes         String?
-  payments Payment[]
-
-  user  User?       @relation(fields: [userId], references: [id])
-  items OrderItem[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-}
-
-model OrderItem {
-  id                String  @id @default(cuid())
-  orderId           String
-  itemId            String
-  quantity          Int
-  unitPriceSnapshot Decimal @db.Decimal(12, 2)
-  totalPrice        Decimal @db.Decimal(12, 2)
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  item  Item  @relation(fields: [itemId], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
-model AuditLog {
-  id        String  @id @default(cuid())
-  userId    String?
-  action    String
-  entity    String
-  entityId  String?
-  metadata  Json?
-
-  user User? @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([entity])
+enum RegistrationStatus {
+  PENDING
+  PAID
+  CANCELLED
+  EXPIRED
 }
 
 enum PaymentStatus {
@@ -245,23 +288,8 @@ enum PaymentStatus {
   REVERSED
 }
 
-model Payment {
-  id              String        @id @default(cuid())
-  orderId         String
-  provider        String        @default("PAYSTACK")
-  reference       String        @unique
-  amount          Decimal       @db.Decimal(12, 2)
-  currency        String        @default("NGN")
-  status          PaymentStatus @default(PENDING)
-  authorizationUrl String?
-  accessCode      String?
-  providerPayload Json?
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orderId])
-  @@index([reference])
+enum TestimonialStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

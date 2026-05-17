@@ -6,25 +6,10 @@ import {
 import { deleteFromCloudinary } from "../../config/cloudinaryService.js";
 import * as itemDb from "./item.db.js";
 import * as categoryDb from "../categories/category.db.js";
-import { getPagination, buildPaginationMeta } from "../../lib/pagination.js";
-
-export const getItems = async (filters) => {
-  const pagination = getPagination(filters);
-
-  const { items, total } = await itemDb.findItems({
-    ...filters,
-    ...pagination,
-  });
-
-  return {
-    items,
-    meta: buildPaginationMeta({
-      page: pagination.page,
-      limit: pagination.limit,
-      total,
-    }),
-  };
-};
+import {
+  getPaginationParams,
+  buildPaginationMeta,
+} from "../../lib/pagination.js";
 
 const normalizePayload = (payload) => ({
   ...payload,
@@ -83,7 +68,7 @@ export const createItem = async (payload) => {
 };
 
 export const getItems = async (filters) => {
-  const pagination = getPagination(filters);
+  const pagination = getPaginationParams(filters.page, filters.limit);
 
   const { items, total } = await itemDb.findItems({
     ...filters,

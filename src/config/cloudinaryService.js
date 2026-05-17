@@ -1,4 +1,4 @@
-import cloudinary from "./cloudinarySetup.js";
+import cloudinary from "./cloudinery.js";
 import { v4 as uuidv4 } from "uuid";
 
 /**
@@ -10,12 +10,9 @@ import { v4 as uuidv4 } from "uuid";
  * @param {string} [options.resourceType="image"] - Resource type (image, video, raw)
  * @returns {Promise<{url, publicId, resourceType, format, bytes}>}
  */
-export const uploadBufferToCloudinary = async ({
-  buffer,
-  folder,
-  publicId,
-  resourceType = "image",
-}) => {
+export const uploadBufferToCloudinary = async (buffer, options = {}) => {
+  const { folder, publicId, resourceType = "image" } = options;
+
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new Error("Invalid buffer provided for Cloudinary upload.");
   }
@@ -29,13 +26,11 @@ export const uploadBufferToCloudinary = async ({
           folder,
           public_id: finalPublicId,
           resource_type: resourceType,
-          overwrite: false, // avoids overwriting existing files
+          overwrite: false,
         },
         (error, result) => {
-          if (error) {
-            console.error("Cloudinary upload error:", error);
-            return reject(error);
-          }
+          if (error) return reject(error);
+
           resolve({
             url: result.secure_url,
             publicId: result.public_id,
@@ -43,7 +38,7 @@ export const uploadBufferToCloudinary = async ({
             format: result.format,
             bytes: result.bytes,
           });
-        }
+        },
       )
       .end(buffer);
   });

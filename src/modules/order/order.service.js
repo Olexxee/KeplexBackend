@@ -1,6 +1,10 @@
 import { prisma } from "../../config/prisma.js";
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
 import * as orderDb from "./order.db.js";
+import {
+  getPaginationParams,
+  formatPaginatedResponse,
+} from "../../lib/pagination.js";
 
 const toNumber = (value) => Number(value);
 
@@ -79,12 +83,34 @@ export const checkout = async (userId, payload) => {
   });
 };
 
-export const getMyOrders = async (userId) => {
-  return orderDb.findOrders({ userId });
+export const getMyOrders = async (userId, filters) => {
+  const { page, limit, status } = filters;
+
+  const { skip, take } = getPaginationParams(page, limit);
+
+  const [data, total] = await orderDb.findOrders({
+    userId,
+    status,
+    skip,
+    take,
+  });
+
+  return formatPaginatedResponse({ data, total, page, limit });
 };
 
 export const getAllOrders = async (filters) => {
-  return orderDb.findOrders(filters);
+  const { page, limit, status, userId } = filters;
+
+  const { skip, take } = getPaginationParams(page, limit);
+
+  const [data, total] = await orderDb.findOrders({
+    userId,
+    status,
+    skip,
+    take,
+  });
+
+  return formatPaginatedResponse({ data, total, page, limit });
 };
 
 export const getOrderById = async (id, user) => {
