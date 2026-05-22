@@ -53,7 +53,7 @@ app.use("/api/orders", orderRouter); // Working
 app.use("/api/payments", paymentRouter);
 app.use("/api/dashboard", dashboardRouter); //Working
 app.use("/api/registrations", registrationRouter);
-app.use("/api/testimonials", testimonialRouter); 
+app.use("/api/testimonials", testimonialRouter);
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
 });

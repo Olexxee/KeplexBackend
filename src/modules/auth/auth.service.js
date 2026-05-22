@@ -1,30 +1,42 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
-import { env } from "../../config/env.js";
 import {
   BadRequestError,
   UnauthorizedError,
   ConflictError,
 } from "../../classes/errorClasses.js";
+
 import * as authDb from "./auth.db.js";
 
-const signToken = (user) => {
-  return jwt.sign(
-    {
-      userId: user.id,
-      role: user.role,
-    },
-    env.jwtSecret,
-    {
-      expiresIn: env.jwtExpiresIn,
-    },
-  );
-};
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  hashRefreshToken,
+} from "./auth.tokens.js";
+
+import { REFRESH_TOKEN_EXPIRES_IN_MS } from "./auth.constants.js";
 
 const sanitizeUser = (user) => {
   const { password, ...safeUser } = user;
   return safeUser;
+};
+
+const buildAuthResponse = async (user) => {
+  const accessToken = generateAccessToken(user);
+
+  const refreshToken = generateRefreshToken();
+
+  await authDb.createRefreshToken({
+    userId: user.id,
+    tokenHash: hashRefreshToken(refreshToken),
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS),
+  });
+
+  return {
+    user: sanitizeUser(user),
+    accessToken,
+    refreshToken,
+  };
 };
 
 export const register = async ({ fullName, email, phone, password }) => {
@@ -43,12 +55,7 @@ export const register = async ({ fullName, email, phone, password }) => {
     password: hashedPassword,
   });
 
-  const token = signToken(user);
-
-  return {
-    user,
-    token,
-  };
+  return buildAuthResponse(user);
 };
 
 export const login = async ({ email, password }) => {
@@ -68,12 +75,48 @@ export const login = async ({ email, password }) => {
     throw new UnauthorizedError("Invalid email or password");
   }
 
-  const token = signToken(user);
+  return buildAuthResponse(user);
+};
+
+export const refreshSession = async (refreshToken) => {
+  if (!refreshToken) {
+    throw new UnauthorizedError("Refresh token missing");
+  }
+
+  const hashedToken = hashRefreshToken(refreshToken);
+
+  const tokenRecord = await authDb.findRefreshToken(hashedToken);
+
+  if (!tokenRecord) {
+    throw new UnauthorizedError("Invalid refresh token");
+  }
+
+  if (tokenRecord.expiresAt < new Date()) {
+    throw new UnauthorizedError("Refresh token expired");
+  }
+
+  const accessToken = generateAccessToken(tokenRecord.user);
 
   return {
-    user: sanitizeUser(user),
-    token,
+    accessToken,
+    user: sanitizeUser(tokenRecord.user),
   };
+};
+
+export const updateMe = async (userId, payload) => {
+  return authDb.updateUser(userId, payload);
+};
+
+export const logout = async (refreshToken) => {
+  if (!refreshToken) return;
+
+  const hashedToken = hashRefreshToken(refreshToken);
+
+  const tokenRecord = await authDb.findRefreshToken(hashedToken);
+
+  if (!tokenRecord) return;
+
+  await authDb.revokeRefreshToken(tokenRecord.id);
 };
 
 export const getMe = async (userId) => {

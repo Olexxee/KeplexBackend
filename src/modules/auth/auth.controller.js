@@ -1,25 +1,77 @@
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
+
 import { successResponse } from "../../lib/response.js";
+
 import * as authService from "./auth.service.js";
+
+import {
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+} from "./auth.cookies.js";
 
 export const register = asyncWrapper(async (req, res) => {
   const result = await authService.register(req.body);
+
+  setRefreshTokenCookie(res, result.refreshToken);
 
   return successResponse({
     res,
     statusCode: 201,
     message: "Account created successfully",
-    data: result,
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+    },
   });
 });
 
 export const login = asyncWrapper(async (req, res) => {
   const result = await authService.login(req.body);
 
+  setRefreshTokenCookie(res, result.refreshToken);
+
   return successResponse({
     res,
     message: "Login successful",
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+    },
+  });
+});
+
+export const updateMe = asyncWrapper(async (req, res) => {
+  const data = await authService.updateMe(req.user.id, req.body);
+
+  return successResponse({
+    res,
+    message: "User updated successfully",
+    data,
+  });
+});
+
+export const refreshSession = asyncWrapper(async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  const result = await authService.refreshSession(refreshToken);
+
+  return successResponse({
+    res,
+    message: "Session refreshed",
     data: result,
+  });
+});
+
+export const logout = asyncWrapper(async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  await authService.logout(refreshToken);
+
+  clearRefreshTokenCookie(res);
+
+  return successResponse({
+    res,
+    message: "Logout successful",
   });
 });
 
