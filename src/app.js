@@ -25,12 +25,12 @@ export const app = express();
 
 app.use("/api/payments", handlePaystackWebhook);
 
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-  }),
-);
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://keplexshopping.vercel.app/",    
+];
+
+
 
 app.use(helmet());
 app.use(morgan("dev"));
