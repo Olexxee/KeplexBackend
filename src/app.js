@@ -27,10 +27,21 @@ app.use("/api/payments", handlePaystackWebhook);
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://keplexshopping.vercel.app/",    
+  "https://keplexshopping.vercel.app",
 ];
 
-
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 app.use(helmet());
 app.use(morgan("dev"));
