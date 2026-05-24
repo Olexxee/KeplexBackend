@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 
 import { handlePaystackWebhook } from "./modules/payment/paystackWebhook.controller.js";
 import dashboardRouter from "./modules/dashboard/dashboard.routes.js";
+import addressRouter from "./modules/address/address.routes.js";
 import paymentRouter from "./modules/payment/payment.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import itemRouter from "./modules/item/item.routes.js";
@@ -17,6 +18,7 @@ import authRouter from "./modules/auth/auth.routes.js";
 import registrationRouter from "./modules/registration/registration.routes.js";
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
+import auditRouter from "./modules/audit/audit.routes.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 
 export const app = express();
@@ -25,7 +27,7 @@ app.use("/api/payments", handlePaystackWebhook);
 
 app.use(
   cors({
-    origin: env.frontendUrl,
+    origin: "http://localhost:5173",
     credentials: true,
   }),
 );
@@ -44,6 +46,7 @@ app.get("/health", (req, res) => {
 });
 
 
+app.use(errorMiddleware);
 app.use("/api/auth", authRouter); // Already works
 app.use("/api/organisation", organisationRouter); // Already works
 app.use("/api/category", categoryRouter); // Working
@@ -52,10 +55,11 @@ app.use("/api/items", itemRouter); // Working
 app.use("/api/orders", orderRouter); // Working
 app.use("/api/payments", paymentRouter);
 app.use("/api/dashboard", dashboardRouter); //Working
-app.use("/api/registrations", registrationRouter);
-app.use("/api/testimonials", testimonialRouter);
+app.use("/api/addresses", addressRouter);
+app.use("/api/audit", auditRouter);
+// app.use("/api/registrations", registrationRouter);
+// app.use("/api/testimonials", testimonialRouter);
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
-});
-
-app.use(errorMiddleware);
+  });
+  

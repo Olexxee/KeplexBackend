@@ -61,7 +61,6 @@ const ensureItemCanBeAdded = async ({ itemId, quantity }) => {
 
 export const getCart = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
-
   return formatCart(cart);
 };
 

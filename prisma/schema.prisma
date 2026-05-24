@@ -30,7 +30,7 @@ model RefreshToken {
   id         String   @id @default(cuid())
 
   userId     String
-  tokenHash  String
+  tokenHash  String   @unique
 
   expiresAt  DateTime
   revokedAt  DateTime?

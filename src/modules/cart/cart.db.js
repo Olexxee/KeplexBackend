@@ -6,9 +6,19 @@ export const findActiveCartByUserId = async (userId) => {
       userId,
       status: "ACTIVE",
     },
-    include: {
+
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+
       items: {
-        include: {
+        select: {
+          id: true,
+          quantity: true,
+
           item: {
             select: {
               id: true,
@@ -17,7 +27,15 @@ export const findActiveCartByUserId = async (userId) => {
               price: true,
               stock: true,
               status: true,
-              images: true,
+
+              media: {
+                take: 1,
+
+                select: {
+                  id: true,
+                  url: true,
+                },
+              },
             },
           },
         },

@@ -2,13 +2,13 @@ import { Router } from "express";
 import * as c from "./address.controller.js";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 
-const router = Router();
+const addressRouter = Router();
 
-router.use(authMiddleware);
+addressRouter.use(authMiddleware);
 
-router.get("/", c.getMyAddresses);
-router.post("/", c.create);
-router.patch("/:id", c.update);
-router.delete("/:id", c.remove);
+addressRouter.get("/", c.getMyAddresses);
+addressRouter.post("/", c.create);
+addressRouter.patch("/:id", c.update);
+addressRouter.delete("/:id", c.remove);
 
-export default router;
+export default addressRouter;

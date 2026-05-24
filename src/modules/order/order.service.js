@@ -18,6 +18,7 @@ const validateCartForCheckout = (cart) => {
   }
 
   for (const cartItem of cart.items) {
+    
     if (!cartItem.item) {
       throw new BadRequestError("One or more cart items are invalid");
     }

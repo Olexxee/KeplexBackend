@@ -14,8 +14,7 @@ export const checkout = asyncWrapper(async (req, res) => {
 });
 
 export const getMyOrders = asyncWrapper(async (req, res) => {
-  const orders = await orderService.getMyOrders(req.user.id);
-
+  const orders = await orderService.getMyOrders(req.user.id, req.query);
   return successResponse({
     res,
     message: "Orders fetched successfully",

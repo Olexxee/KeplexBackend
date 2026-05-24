@@ -2,15 +2,12 @@ import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
 import { UnauthorizedError } from "../classes/errorClasses.js";
+
 import * as authDb from "../modules/auth/auth.db.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-
-    const token = authHeader?.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : req.cookies?.token;
+    const token = req.cookies?.accessToken;
 
     if (!token) {
       throw new UnauthorizedError("Authentication token is required");
