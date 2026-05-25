@@ -13,6 +13,7 @@ import itemRouter from "./modules/item/item.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
 import categoryRouter from "./modules/categories/category.routes.js";
 import orderRouter from "./modules/order/order.routes.js";
+import adminRouter from "./modules/admin/admin.routes.js";
 import testimonialRouter from "./modules/testimonials/testimonialRoutes.js";
 import authRouter from "./modules/auth/auth.routes.js";
 import registrationRouter from "./modules/registration/registration.routes.js";
@@ -68,6 +69,7 @@ app.use("/api/payments", paymentRouter);
 app.use("/api/dashboard", dashboardRouter); //Working
 app.use("/api/addresses", addressRouter);
 app.use("/api/audit", auditRouter);
+app.use("/api/admin", adminRouter); 
 // app.use("/api/registrations", registrationRouter);
 // app.use("/api/testimonials", testimonialRouter);
 app.use((req, res, next) => {

@@ -19,6 +19,7 @@ const itemInclude = {
 
 export const createItem = async (data) => {
   const { images = [], ...itemData } = data;
+  const mediaList = Array.isArray(images) ? images : [];
 
   return prisma.item.create({
     data: {

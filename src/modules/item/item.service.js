@@ -16,7 +16,7 @@ const normalizePayload = (payload) => ({
   description: payload.description || null,
   sku: payload.sku || null,
   compareAtPrice: payload.compareAtPrice ?? null,
-  images: payload.images || null,
+  images: Array.isArray(payload.images) ? payload.images : [],
   metadata: payload.metadata || null,
 });
 

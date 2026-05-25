@@ -32,8 +32,8 @@ itemRouter.post(
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   uploadItemImages,
+  parseMultipartJsonFields(["features", "specifications"]), // before processItemImages
   processItemImages,
-  parseMultipartJsonFields(["features", "specifications"]),
   validateBody(createItemSchema),
   itemController.createItem,
 );

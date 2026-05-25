@@ -10,7 +10,7 @@ const itemImageSchema = Joi.object({
 });
 
 export const createItemSchema = Joi.object({
-  categoryId: Joi.string().required(),
+  categoryId: Joi.string().optional().allow(null, ""),
   name: Joi.string().trim().min(2).max(150).required(),
   slug: Joi.string().trim().lowercase().min(2).max(150).required(),
   description: Joi.string().trim().allow(null, "").optional(),
@@ -18,12 +18,10 @@ export const createItemSchema = Joi.object({
   compareAtPrice: Joi.number().min(0).allow(null).optional(),
   sku: Joi.string().trim().allow(null, "").optional(),
   stock: Joi.number().integer().min(0).default(0),
-  itemType: Joi.string()
-    .valid("PRODUCT", "SERVICE", "PACKAGE")
-    .default("PRODUCT"),
-  status: Joi.string().valid("DRAFT", "ACTIVE", "ARCHIVED").default("DRAFT"),
-  images: Joi.array().items(itemImageSchema).optional(),
+  itemType: Joi.string().valid("PRODUCT", "SERVICE", "PACKAGE").default("PRODUCT"),
+  status: Joi.string().valid("ACTIVE", "INACTIVE", "OUT_OF_STOCK", "DRAFT", "ARCHIVED").default("ACTIVE"),
   metadata: Joi.object().optional(),
+  images: Joi.array().items(Joi.object()).optional(), 
 });
 
 export const updateItemSchema = createItemSchema
