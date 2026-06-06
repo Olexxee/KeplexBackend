@@ -76,6 +76,18 @@ export const logout = asyncWrapper(async (req, res) => {
   });
 });
 
+export const changePassword = asyncWrapper(async (req, res) => {
+  await authService.changePassword({
+    user: req.user,
+    ...req.body,
+  });
+
+  return successResponse({
+    res,
+    message: "Password changed successfully",
+  });
+});
+
 export const getMe = asyncWrapper(async (req, res) => {
   const user = await authService.getMe(req.user.id);
 

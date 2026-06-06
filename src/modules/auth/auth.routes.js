@@ -24,6 +24,8 @@ authRouter.post("/logout", authController.logout);
 
 authRouter.patch("/me", authMiddleware, authController.updateMe);
 
+authRouter.post("/change-password", authMiddleware, authController.changePassword);
+
 authRouter.get("/me", authMiddleware, authController.getMe);
 
 export default authRouter;

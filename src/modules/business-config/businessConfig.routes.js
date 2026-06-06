@@ -1,6 +1,5 @@
 import { Router } from "express";
-
-import { authMiddleware } from "../../middleware/auth.middleware.js";
+import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 
 import {
@@ -9,13 +8,14 @@ import {
   updateConfig,
 } from "./businessConfig.controller.js";
 
-const router = Router();
+const configRouter = Router();
 
-router.use(authMiddleware);
-router.use(roleMiddleware("SUPER_ADMIN", "ADMIN"));
+configRouter.use(authMiddleware);
+configRouter.use(roleMiddleware("SUPER_ADMIN", "ADMIN"));
+configRouter.get("/", getAllConfigs);
+configRouter.get("/:key", getConfigByKey);
+configRouter.patch("/:key", updateConfig);
 
-router.get("/", getAllConfigs);
-router.get("/:key", getConfigByKey);
-router.patch("/:key", updateConfig);
 
-export default router;
+
+export default configRouter;

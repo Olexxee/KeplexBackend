@@ -78,6 +78,34 @@ export const login = async ({ email, password }) => {
   return buildAuthResponse(user);
 };
 
+export const changePassword = async ({
+  user,
+  currentPassword,
+  newPassword,
+}) => {
+  // re-fetch full user record to get hashed password
+  const fullUser = await authDb.findUserByEmailWithPassword(user.email);
+
+  if (!fullUser) {
+    throw new UnauthorizedError("User not found");
+  }
+
+  const valid = await bcrypt.compare(currentPassword, fullUser.password);
+
+  if (!valid) {
+    throw new BadRequestError("Current password is incorrect");
+  }
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+
+  await authDb.updateUser(user.id, { password: hashed });
+
+  // revoke all refresh tokens to force re-login on other devices
+  await authDb.revokeAllUserRefreshTokens(user.id);
+
+  return true;
+};
+
 export const refreshSession = async (refreshToken) => {
   if (!refreshToken) {
     throw new UnauthorizedError("Refresh token missing");
@@ -106,6 +134,8 @@ export const refreshSession = async (refreshToken) => {
 export const updateMe = async (userId, payload) => {
   return authDb.updateUser(userId, payload);
 };
+
+
 
 export const logout = async (refreshToken) => {
   if (!refreshToken) return;

@@ -11,6 +11,7 @@ import organisationRouter from "./modules/organization/organisation.routes.js";
 import itemRouter from "./modules/item/item.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
 import categoryRouter from "./modules/categories/category.routes.js";
+import configRouter from "./modules/business-config/businessConfig.routes.js";
 import orderRouter from "./modules/order/order.routes.js";
 import adminRouter from "./modules/admin/admin.routes.js";
 import testimonialRouter from "./modules/testimonials/testimonialRoutes.js";
@@ -70,6 +71,7 @@ app.use("/api/addresses", addressRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/admin", adminRouter); 
 app.use("/api/registrations", registrationRouter);
+app.use("/api/business-config", configRouter);
 // app.use("/api/testimonials", testimonialRouter);
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
