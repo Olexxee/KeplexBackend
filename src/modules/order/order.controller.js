@@ -2,17 +2,6 @@ import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
 import * as orderService from "./order.service.js";
 
-export const checkout = asyncWrapper(async (req, res) => {
-  const order = await orderService.checkout(req.user.id, req.body);
-
-  return successResponse({
-    res,
-    statusCode: 201,
-    message: "Checkout completed successfully",
-    data: order,
-  });
-});
-
 export const getMyOrders = asyncWrapper(async (req, res) => {
   const orders = await orderService.getMyOrders(req.user.id, req.query);
   return successResponse({
@@ -51,6 +40,20 @@ export const updateOrderStatus = asyncWrapper(async (req, res) => {
   return successResponse({
     res,
     message: "Order status updated successfully",
+    data: order,
+  });
+});
+
+export const checkout = asyncWrapper(async (req, res) => {
+  const order = await orderService.checkout({
+    userId: req.user.id,
+    payload: req.body,
+  });
+
+  return successResponse({
+    res,
+    statusCode: 201,
+    message: "Checkout completed successfully",
     data: order,
   });
 });

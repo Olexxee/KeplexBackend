@@ -1,123 +1,95 @@
-import{ prisma} from "../../config/prisma.js";
+import { prisma } from "../../config/prisma.js";
 
-const dbClient = (tx) => tx || prisma;
-
-export const createRegistration = async (data, tx = null) => {
-  const db = dbClient(tx);
-
-  return db.trainingRegistration.create({
+export const createRegistration = async (data) => {
+  return prisma.trainingEnrollment.create({
     data,
+    include: {
+      trainingProgram: true,
+    },
   });
 };
 
-export const findRegistrationById = async (id, tx = null) => {
-  const db = dbClient(tx);
-
-  return db.trainingRegistration.findUnique({
+export const findRegistrationById = async (id) => {
+  return prisma.trainingEnrollment.findUnique({
     where: { id },
+    include: {
+      trainingProgram: true,
+    },
   });
 };
 
-export const findRegistrationByPaymentRef = async (paymentRef, tx = null) => {
-  const db = dbClient(tx);
-
-  return db.trainingRegistration.findUnique({
-    where: { paymentRef },
-  });
-};
-
-export const updateRegistrationById = async (id, data, tx = null) => {
-  const db = dbClient(tx);
-
-  return db.trainingRegistration.update({
-    where: { id },
-    data,
-  });
-};
-
-export const updateRegistrationByPaymentRef = async (
-  paymentRef,
-  data,
-  tx = null,
+export const findRegistrationByEmailAndProgram = async (
+  email,
+  trainingProgramId,
 ) => {
-  const db = dbClient(tx);
+  return prisma.trainingEnrollment.findUnique({
+    where: {
+      trainingProgramId_email: {
+        trainingProgramId,
+        email,
+      },
+    },
+  });
+};
 
-  return db.trainingRegistration.update({
+export const findRegistrationByPaymentRef = async (paymentRef) => {
+  return prisma.trainingEnrollment.findUnique({
     where: { paymentRef },
+    include: {
+      trainingProgram: true,
+    },
+  });
+};
+
+export const updateRegistrationById = async (id, data) => {
+  return prisma.trainingEnrollment.update({
+    where: { id },
     data,
+    include: {
+      trainingProgram: true,
+    },
   });
 };
 
 export const listRegistrations = async ({
-  page = 1,
-  limit = 20,
-  search,
   status,
-  from,
-  to,
+  trainingProgramId,
+  skip,
+  take,
 } = {}) => {
-  const skip = (Number(page) - 1) * Number(limit);
-
   const where = {
-    ...(status ? { status } : {}),
-
-    ...(search
-      ? {
-          OR: [
-            { fullName: { contains: search, mode: "insensitive" } },
-            { email: { contains: search, mode: "insensitive" } },
-            { phone: { contains: search, mode: "insensitive" } },
-            { paymentRef: { contains: search, mode: "insensitive" } },
-          ],
-        }
-      : {}),
-
-    ...(from || to
-      ? {
-          createdAt: {
-            ...(from ? { gte: new Date(from) } : {}),
-            ...(to ? { lte: new Date(to) } : {}),
-          },
-        }
-      : {}),
+    ...(status && { status }),
+    ...(trainingProgramId && { trainingProgramId }),
   };
 
-  const [items, total] = await Promise.all([
-    prisma.trainingRegistration.findMany({
+  return Promise.all([
+    prisma.trainingEnrollment.findMany({
       where,
-      orderBy: { createdAt: "desc" },
       skip,
-      take: Number(limit),
+      take,
+      include: {
+        trainingProgram: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            price: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
     }),
-
-    prisma.trainingRegistration.count({ where }),
+    prisma.trainingEnrollment.count({ where }),
   ]);
-
-  return {
-    items,
-    meta: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-      totalPages: Math.ceil(total / Number(limit)),
-    },
-  };
 };
 
 export const getRegistrationStats = async () => {
-  const [total, pending, paid, cancelled, expired] = await Promise.all([
-    prisma.trainingRegistration.count(),
-    prisma.trainingRegistration.count({ where: { status: "PENDING" } }),
-    prisma.trainingRegistration.count({ where: { status: "PAID" } }),
-    prisma.trainingRegistration.count({ where: { status: "CANCELLED" } }),
-    prisma.trainingRegistration.count({ where: { status: "EXPIRED" } }),
+  const [total, paid, pending, cancelled] = await Promise.all([
+    prisma.trainingEnrollment.count(),
+    prisma.trainingEnrollment.count({ where: { status: "PAID" } }),
+    prisma.trainingEnrollment.count({ where: { status: "PENDING" } }),
+    prisma.trainingEnrollment.count({ where: { status: "CANCELLED" } }),
   ]);
 
-  return {
-    total,
-    pending,
-    paid,
-    cancelled,
-    expired,
-  };
+  return { total, paid, pending, cancelled };
 };

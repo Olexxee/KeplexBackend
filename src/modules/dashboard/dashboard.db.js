@@ -1,10 +1,19 @@
 import { prisma } from "../../config/prisma.js";
 
 export const getOrderStatusCounts = async () => {
-  return prisma.order.groupBy({
+  const results = await prisma.order.groupBy({
     by: ["status"],
-    _count: { status: true },
+    _count: {
+      status: true,
+    },
   });
+
+  return results.map((row) => ({
+    status: row.status,
+    _count: {
+      status: row._count.status,
+    },
+  }));
 };
 
 export const getRevenueStats = async () => {
@@ -25,19 +34,13 @@ export const getRevenueStats = async () => {
 
 export const getPendingOrders = async () => {
   return prisma.order.findMany({
-    where: { status: "PENDING" },
-    take: 10,
-    orderBy: { createdAt: "desc" },
-    include: {
-      items: true,
+    where: {
+      status: "PENDING",
     },
-  });
-};
-
-export const getRecentOrders = async () => {
-  return prisma.order.findMany({
     take: 10,
-    orderBy: { createdAt: "desc" },
+    orderBy: {
+      createdAt: "desc",
+    },
     include: {
       user: {
         select: {
@@ -46,9 +49,75 @@ export const getRecentOrders = async () => {
           email: true,
         },
       },
-      items: true,
+      items: {
+        include: {
+          item: true,
+        },
+      },
     },
   });
+};
+
+export const getRecentOrders = async () => {
+  return prisma.order.findMany({
+    take: 10,
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+      items: {
+        include: {
+          item: true,
+        },
+      },
+    },
+  });
+};
+
+export const getPaymentStats = async () => {
+  const results = await prisma.payment.groupBy({
+    by: ["status"],
+    _count: {
+      status: true,
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  return results.map((row) => ({
+    status: row.status,
+    _count: {
+      status: row._count.status,
+    },
+    _sum: {
+      amount: row._sum.amount || 0,
+    },
+  }));
+};
+
+// Fixed: Use TrainingRegistration instead of Registration
+export const getRegistrationStatusCounts = async () => {
+  const results = await prisma.trainingRegistration.groupBy({
+    by: ["status"],
+    _count: {
+      status: true,
+    },
+  });
+
+  return results.map((row) => ({
+    status: row.status,
+    _count: {
+      status: row._count.status,
+    },
+  }));
 };
 
 export const getLowStockItems = async () => {
@@ -67,15 +136,17 @@ export const getLowStockItems = async () => {
     include: {
       category: true,
       media: {
-        orderBy: { sortOrder: "asc" },
         take: 1,
+        orderBy: {
+          sortOrder: "asc",
+        },
       },
     },
   });
 };
 
 export const getTopItems = async () => {
-  return prisma.orderItem.groupBy({
+  const results = await prisma.orderItem.groupBy({
     by: ["itemId"],
     _sum: {
       quantity: true,
@@ -88,9 +159,19 @@ export const getTopItems = async () => {
     },
     take: 10,
   });
+
+  return results.map((row) => ({
+    itemId: row.itemId,
+    _sum: {
+      quantity: row._sum.quantity || 0,
+      totalPrice: row._sum.totalPrice || 0,
+    },
+  }));
 };
 
 export const getItemsByIds = async (ids) => {
+  if (!ids.length) return [];
+
   return prisma.item.findMany({
     where: {
       id: {
@@ -99,8 +180,10 @@ export const getItemsByIds = async (ids) => {
     },
     include: {
       media: {
-        orderBy: { sortOrder: "asc" },
         take: 1,
+        orderBy: {
+          sortOrder: "asc",
+        },
       },
       category: true,
     },
@@ -108,11 +191,12 @@ export const getItemsByIds = async (ids) => {
 };
 
 export const getBasicCounts = async () => {
-  const [users, categories, items, orders] = await Promise.all([
+  const [users, categories, items, orders, registrations] = await Promise.all([
     prisma.user.count(),
     prisma.category.count(),
     prisma.item.count(),
     prisma.order.count(),
+    prisma.trainingRegistration.count(), 
   ]);
 
   return {
@@ -120,5 +204,6 @@ export const getBasicCounts = async () => {
     categories,
     items,
     orders,
+    registrations,
   };
 };

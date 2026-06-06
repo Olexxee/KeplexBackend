@@ -1,68 +1,54 @@
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
+import { successResponse } from "../../lib/response.js";
 import * as registrationService from "./registrationService.js";
 
-export const initializeRegistration = asyncWrapper(async (req, res) => {
-  const result = await registrationService.createRegistrationPayment(req.body);
-
-  return res.status(201).json({
-    success: true,
-    message: "Registration payment initialized",
-    data: result,
-  });
-});
-
-export const verifyRegistration = asyncWrapper(async (req, res) => {
-  const result = await registrationService.verifyRegistrationPayment(
-    req.params.reference,
-  );
-
-  return res.status(200).json({
-    success: true,
-    message: "Registration payment verified",
+export const createRegistration = asyncWrapper(async (req, res) => {
+  const result = await registrationService.createRegistration(req.body);
+  return successResponse({
+    res,
+    statusCode: 201,
+    message: "Registration created successfully",
     data: result,
   });
 });
 
 export const getRegistrations = asyncWrapper(async (req, res) => {
   const result = await registrationService.getRegistrations(req.query);
-
-  return res.status(200).json({
-    success: true,
+  return successResponse({
+    res,
     message: "Registrations fetched successfully",
-    data: result.items,
-    meta: result.meta,
+    data: result,
   });
 });
 
 export const getRegistrationById = asyncWrapper(async (req, res) => {
-  const result = await registrationService.getRegistrationById(req.params.id);
-
-  return res.status(200).json({
-    success: true,
+  const registration = await registrationService.getRegistrationById(
+    req.params.id,
+  );
+  return successResponse({
+    res,
     message: "Registration fetched successfully",
-    data: result,
+    data: registration,
   });
 });
 
-export const getRegistrationStats = asyncWrapper(async (req, res) => {
-  const result = await registrationService.getRegistrationStats();
-
-  return res.status(200).json({
-    success: true,
+export const getRegistrationStats = asyncWrapper(async (_req, res) => {
+  const stats = await registrationService.getRegistrationStats();
+  return successResponse({
+    res,
     message: "Registration stats fetched successfully",
-    data: result,
+    data: stats,
   });
 });
 
 export const updateRegistrationStatus = asyncWrapper(async (req, res) => {
-  const result = await registrationService.updateRegistrationStatus({
+  const registration = await registrationService.updateRegistrationStatus({
     id: req.params.id,
     status: req.body.status,
   });
-
-  return res.status(200).json({
-    success: true,
+  return successResponse({
+    res,
     message: "Registration status updated successfully",
-    data: result,
+    data: registration,
   });
 });

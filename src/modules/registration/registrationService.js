@@ -1,155 +1,74 @@
-import axios from "axios";
-
-import { env } from "../../config/env.js";
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
-import { enqueueNotification } from "../../queues/notification.queue.js";
 import * as registrationDb from "./registration.db.js";
+import * as paymentService from "../payment/payment.service.js";
+import { findTrainingProgramById } from "../training-programs/trainingProgram.db.js";
+import {
+  getPaginationParams,
+  formatPaginatedResponse,
+} from "../../lib/pagination.js";
 
-const PAYSTACK_BASE_URL = "https://api.paystack.co";
-const TRAINING_AMOUNT = 5000;
-const FINAL_REGISTRATION_STATUSES = ["PAID", "CANCELLED", "EXPIRED"];
+const normalizeStatus = (status) =>
+  status ? String(status).trim().toUpperCase() : null;
 
-const toKobo = (amount) => Math.round(Number(amount) * 100);
-
-const generateReference = (registrationId) => {
-  return `KPX-REG-${registrationId}-${Date.now()}`;
-};
-
-const normalizeRegistrationStatus = (status) => {
-  if (!status) return null;
-
-  return String(status).trim().toUpperCase();
-};
-
-const assertValidManualStatus = (status) => {
-  const allowedStatuses = ["CANCELLED", "EXPIRED"];
-
-  if (!allowedStatuses.includes(status)) {
-    throw new BadRequestError(
-      "Only CANCELLED or EXPIRED can be set manually",
-    );
-  }
-};
-
-export const createRegistrationPayment = async ({
+export const createRegistration = async ({
+  trainingProgramId,
   fullName,
   email,
   phone,
 }) => {
-  if (!fullName || !email || !phone) {
-    throw new BadRequestError("Full name, email and phone are required");
+  const training = await findTrainingProgramById(trainingProgramId);
+
+  if (!training) {
+    throw new NotFoundError("Training program not found");
+  }
+
+  if (!training.active) {
+    throw new BadRequestError("Training program is currently unavailable");
+  }
+
+  // prevent duplicate registrations for the same email + program
+  const existing = await registrationDb.findRegistrationByEmailAndProgram(
+    email.trim().toLowerCase(),
+    trainingProgramId,
+  );
+
+  if (existing) {
+    throw new BadRequestError(
+      "This email is already registered for this program",
+    );
   }
 
   const registration = await registrationDb.createRegistration({
+    trainingProgramId,
     fullName: fullName.trim(),
     email: email.trim().toLowerCase(),
     phone: phone.trim(),
-    amount: TRAINING_AMOUNT,
-    currency: "NGN",
     status: "PENDING",
-    provider: "PAYSTACK",
   });
 
-  const reference = generateReference(registration.id);
-
-  const response = await axios.post(
-    `${PAYSTACK_BASE_URL}/transaction/initialize`,
-    {
-      email: registration.email,
-      amount: toKobo(TRAINING_AMOUNT),
-      reference,
-      callback_url: env.paystack.callbackUrl,
-      currency: "NGN",
-      metadata: {
-        type: "TRAINING_REGISTRATION",
-        registrationId: registration.id,
-        fullName: registration.fullName,
-        phone: registration.phone,
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${env.paystack.secretKey}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  const paystackData = response.data?.data;
-
-  if (!response.data?.status || !paystackData?.authorization_url) {
-    throw new BadRequestError("Unable to initialize registration payment");
-  }
-
-  const updatedRegistration = await registrationDb.updateRegistrationById(
-    registration.id,
-    {
-      paymentRef: reference,
-      authorizationUrl: paystackData.authorization_url,
-      accessCode: paystackData.access_code,
-      providerPayload: response.data,
-    },
-  );
+  // immediately initialize payment and return authorization URL
+  const payment = await paymentService.initializeRegistrationPayment({
+    registrationId: registration.id,
+  });
 
   return {
-    registrationId: updatedRegistration.id,
-    reference: updatedRegistration.paymentRef,
-    authorizationUrl: updatedRegistration.authorizationUrl,
-    accessCode: updatedRegistration.accessCode,
+    registration,
+    payment,
   };
 };
 
-export const verifyRegistrationPayment = async (reference) => {
-  const registration =
-    await registrationDb.findRegistrationByPaymentRef(reference);
+export const getRegistrations = async (query) => {
+  const { page = 1, limit = 20, status, trainingProgramId } = query;
+  const { skip, take } = getPaginationParams(page, limit);
 
-  if (!registration) {
-    throw new NotFoundError("Registration payment not found");
-  }
-
-  if (FINAL_REGISTRATION_STATUSES.includes(registration.status)) {
-    return registration;
-  }
-
-  const response = await axios.get(
-    `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
-    {
-      headers: {
-        Authorization: `Bearer ${env.paystack.secretKey}`,
-      },
-    },
-  );
-
-  const paystackData = response.data?.data;
-
-  if (!response.data?.status || !paystackData) {
-    throw new BadRequestError("Unable to verify registration payment");
-  }
-
-  if (paystackData.status !== "success") {
-    return registrationDb.updateRegistrationById(registration.id, {
-      providerPayload: response.data,
-    });
-  }
-
-  const paidRegistration = await registrationDb.updateRegistrationById(
-    registration.id,
-    {
-      status: "PAID",
-      paidAt: new Date(),
-      providerPayload: response.data,
-    },
-  );
-
-  await enqueueNotification("REGISTRATION_CONFIRMED", {
-    registration: paidRegistration,
+  const [data, total] = await registrationDb.listRegistrations({
+    status: normalizeStatus(status),
+    trainingProgramId,
+    skip,
+    take,
   });
 
-  return paidRegistration;
-};
-
-export const getRegistrations = async (query) => {
-  return registrationDb.listRegistrations(query);
+  return formatPaginatedResponse({ data, total, page, limit });
 };
 
 export const getRegistrationById = async (id) => {
@@ -167,22 +86,15 @@ export const getRegistrationStats = async () => {
 };
 
 export const updateRegistrationStatus = async ({ id, status }) => {
-  const normalizedStatus = normalizeRegistrationStatus(status);
-
-  assertValidManualStatus(normalizedStatus);
-
   const registration = await registrationDb.findRegistrationById(id);
 
   if (!registration) {
     throw new NotFoundError("Registration not found");
   }
 
-  if (registration.status === "PAID") {
-    throw new BadRequestError("Paid registrations cannot be manually changed");
-  }
+  const normalizedStatus = normalizeStatus(status);
 
   return registrationDb.updateRegistrationById(id, {
     status: normalizedStatus,
-    ...(normalizedStatus === "CANCELLED" ? { cancelledAt: new Date() } : {}),
   });
 };

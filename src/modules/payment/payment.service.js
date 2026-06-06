@@ -1,40 +1,16 @@
-import axios from "axios";
-
-import { env } from "../../config/env.js";
-import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
-import { enqueueNotification } from "../../queues/notification.queue.js";
+import * as paystack from "./paymentGateway/paystack.js";
 import * as paymentDb from "./payment.db.js";
+import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
+import * as registrationDb from "../registration/registration.db.js";
+import { prisma } from "../../config/prisma.js";
 
-const PAYSTACK_BASE_URL = "https://api.paystack.co";
+// ─────────────────────────────────────────
+// ORDER PAYMENT
+// ─────────────────────────────────────────
 
-const FINAL_PAYMENT_STATUSES = ["SUCCESS", "FAILED", "REVERSED"];
-
-const generateReference = (orderId) => {
-  return `KPX-${orderId}-${Date.now()}`;
-};
-
-const toKobo = (amount) => {
-  return Math.round(Number(amount) * 100);
-};
-
-const mapPaystackStatus = (status) => {
-  if (status === "success") return "SUCCESS";
-  if (status === "failed") return "FAILED";
-  if (status === "abandoned") return "ABANDONED";
-  if (status === "reversed") return "REVERSED";
-
-  return "PENDING";
-};
-
-export const initializePayment = async ({ orderId, user }) => {
-  const order = await paymentDb.findOrderById(orderId);
-
-  if (!order) {
-    throw new NotFoundError("Order not found");
-  }
-
+export const initializePayment = async ({ order, user }) => {
   const isOwner = order.userId === user.id;
-  const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(user.role);
+  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
 
   if (!isOwner && !isAdmin) {
     throw new NotFoundError("Order not found");
@@ -44,111 +20,200 @@ export const initializePayment = async ({ orderId, user }) => {
     throw new BadRequestError("Only pending orders can be paid for");
   }
 
-  const existingPendingPayment = order.payments.find(
-    (payment) => payment.status === "PENDING",
-  );
+  const existing = order.payments?.find((p) => p.status === "PENDING");
+  if (existing?.authorizationUrl) return existing;
 
-  if (existingPendingPayment?.authorizationUrl) {
-    return existingPendingPayment;
+  const email = order.user?.email;
+
+  if (!email) {
+    throw new BadRequestError("Customer email not found");
   }
+  
+  if (!email) throw new BadRequestError("Missing customer email");
 
-  const customerEmail = order.customerEmail || order.user?.email;
+  const reference = paystack.generateReference("KPX-ORDER");
 
-  if (!customerEmail) {
-    throw new BadRequestError(
-      "Customer email is required to initialize payment",
-    );
-  }
-
-  const reference = generateReference(order.id);
-
-  const response = await axios.post(
-    `${PAYSTACK_BASE_URL}/transaction/initialize`,
-    {
-      email: customerEmail,
-      amount: toKobo(order.totalAmount),
-      reference,
-      callback_url: env.paystack.callbackUrl,
-      currency: "NGN",
-      metadata: {
-        orderId: order.id,
-        userId: order.userId,
-        customerName: order.customerName,
-        customerPhone: order.customerPhone,
-      },
+  const init = await paystack.initializeTransaction({
+    email,
+    amount: order.totalAmount,
+    reference,
+    metadata: {
+      type: "ORDER_PAYMENT",
+      orderId: order.id,
+      userId: order.userId,
     },
-    {
-      headers: {
-        Authorization: `Bearer ${env.paystack.secretKey}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  const paystackData = response.data?.data;
-
-  if (!response.data?.status || !paystackData?.authorization_url) {
-    throw new BadRequestError("Unable to initialize payment");
-  }
+  });
 
   return paymentDb.createPayment({
     orderId: order.id,
+    paymentType: "ORDER_PAYMENT",
     provider: "PAYSTACK",
     reference,
     amount: order.totalAmount,
     currency: "NGN",
     status: "PENDING",
-    authorizationUrl: paystackData.authorization_url,
-    accessCode: paystackData.access_code,
-    providerPayload: response.data,
+    authorizationUrl: init.authorization_url,
+    accessCode: init.access_code,
+    providerPayload: init.raw,
   });
 };
 
-export const verifyPayment = async (reference) => {
-  const existingPayment = await paymentDb.findPaymentByReference(reference);
+// ─────────────────────────────────────────
+// REGISTRATION PAYMENT
+// ─────────────────────────────────────────
 
-  if (!existingPayment) {
-    throw new NotFoundError("Payment not found");
+export const initializeRegistrationPayment = async ({ registrationId }) => {
+  const registration =
+    await registrationDb.findRegistrationById(registrationId);
+
+  if (!registration) {
+    throw new NotFoundError("Registration not found");
   }
 
-  if (FINAL_PAYMENT_STATUSES.includes(existingPayment.status)) {
-    return existingPayment;
+  if (registration.status === "PAID") {
+    throw new BadRequestError("Registration already paid");
   }
 
-  const response = await axios.get(
-    `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
-    {
-      headers: {
-        Authorization: `Bearer ${env.paystack.secretKey}`,
-      },
+  // price lives on the training program, not the enrollment
+  const amount = registration.trainingProgram.price;
+  const email = registration.email;
+  const reference = paystack.generateReference("KPX-REG");
+
+  const init = await paystack.initializeTransaction({
+    email,
+    amount,
+    reference,
+    metadata: {
+      type: "TRAINING_REGISTRATION",
+      registrationId: registration.id,
+      trainingProgramId: registration.trainingProgramId,
     },
-  );
-
-  const paystackData = response.data?.data;
-
-  if (!response.data?.status || !paystackData) {
-    throw new BadRequestError("Unable to verify payment");
-  }
-
-  const mappedStatus = mapPaystackStatus(paystackData.status);
-
-  const updatedPayment = await paymentDb.updatePaymentByReference(reference, {
-    status: mappedStatus,
-    providerPayload: response.data,
   });
 
-  const shouldConfirmOrder =
-    mappedStatus === "SUCCESS" && updatedPayment.order.status === "PENDING";
+  // create a unified Payment row so verify logic stays in one place
+  await paymentDb.createPayment({
+    paymentType: "TRAINING_REGISTRATION",
+    provider: "PAYSTACK",
+    reference,
+    amount,
+    currency: "NGN",
+    status: "PENDING",
+    authorizationUrl: init.authorization_url,
+    accessCode: init.access_code,
+    providerPayload: init.raw,
+    metadata: {
+      type: "TRAINING_REGISTRATION",
+      registrationId: registration.id,
+      trainingProgramId: registration.trainingProgramId,
+    },
+  });
 
-  if (shouldConfirmOrder) {
-    const confirmedOrder = await paymentDb.markOrderConfirmed(
-      updatedPayment.orderId,
-    );
+  // also stamp the reference on the enrollment for easy lookup
+  await registrationDb.updateRegistrationById(registration.id, {
+    paymentRef: reference,
+    authorizationUrl: init.authorization_url,
+    accessCode: init.access_code,
+  });
 
-    await enqueueNotification("ORDER_CONFIRMED", {
-      order: confirmedOrder,
-    });
+  return {
+    reference,
+    authorizationUrl: init.authorization_url,
+    accessCode: init.access_code,
+  };
+};
+
+// ─────────────────────────────────────────
+// UNIFIED VERIFY — works for all payment types
+// ─────────────────────────────────────────
+
+export const verifyPayment = async (reference) => {
+  const payment = await paymentDb.findPaymentByReference(reference);
+
+  if (!payment) throw new NotFoundError("Payment not found");
+
+  // already settled — return early, don't re-verify
+  if (["SUCCESS", "FAILED", "REVERSED"].includes(payment.status)) {
+    return payment;
   }
 
-  return updatedPayment;
+  const verification = await paystack.verifyTransaction(reference);
+
+  const updated = await paymentDb.updatePaymentByReference(reference, {
+    status: verification.status,
+    providerPayload: verification.raw,
+  });
+
+  if (verification.status !== "SUCCESS") return updated;
+
+  // post-success side effects per payment type
+  const type = payment.metadata?.type ?? payment.paymentType;
+
+  if (type === "ORDER_PAYMENT" && updated.order?.status === "PENDING") {
+    await paymentDb.markOrderConfirmed(updated.orderId);
+  }
+
+  if (type === "TRAINING_REGISTRATION") {
+    const registrationId = payment.metadata?.registrationId;
+    if (registrationId) {
+      await registrationDb.updateRegistrationById(registrationId, {
+        status: "PAID",
+        paidAt: new Date(),
+      });
+    }
+  }
+
+  return updated;
+};
+
+// ─────────────────────────────────────────
+// WEBHOOK — idempotent, handles all types
+// ─────────────────────────────────────────
+
+export const handleWebhook = async (event) => {
+  if (event?.event !== "charge.success") return;
+
+  const reference = event.data?.reference;
+  if (!reference) return;
+
+  const payment = await paymentDb.findPaymentByReference(reference);
+
+  // unknown reference or already processed
+  if (!payment) return;
+  if (payment.status === "SUCCESS") return;
+
+  const status = paystack.mapStatus(event.data.status);
+  const type = payment.metadata?.type ?? payment.paymentType;
+
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.payment.update({
+      where: { reference },
+      data: {
+        status,
+        providerPayload: event,
+      },
+      include: { order: true },
+    });
+
+    if (status !== "SUCCESS") return;
+
+    if (type === "ORDER_PAYMENT" && updated.order?.status === "PENDING") {
+      await tx.order.update({
+        where: { id: updated.orderId },
+        data: { status: "CONFIRMED" },
+      });
+    }
+
+    if (type === "TRAINING_REGISTRATION") {
+      const registrationId = payment.metadata?.registrationId;
+      if (registrationId) {
+        await tx.trainingEnrollment.update({
+          where: { id: registrationId },
+          data: {
+            status: "PAID",
+            paidAt: new Date(),
+          },
+        });
+      }
+    }
+  });
 };

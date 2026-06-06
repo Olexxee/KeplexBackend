@@ -4,7 +4,6 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 
-import { handlePaystackWebhook } from "./modules/payment/paystackWebhook.controller.js";
 import dashboardRouter from "./modules/dashboard/dashboard.routes.js";
 import addressRouter from "./modules/address/address.routes.js";
 import paymentRouter from "./modules/payment/payment.routes.js";
@@ -24,7 +23,7 @@ import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 
 export const app = express();
 
-app.use("/api/payments", handlePaystackWebhook);
+// app.use("/api/payments", handlePaystackWebhook);
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -70,7 +69,7 @@ app.use("/api/dashboard", dashboardRouter); //Working
 app.use("/api/addresses", addressRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/admin", adminRouter); 
-// app.use("/api/registrations", registrationRouter);
+app.use("/api/registrations", registrationRouter);
 // app.use("/api/testimonials", testimonialRouter);
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));

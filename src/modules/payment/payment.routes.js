@@ -1,20 +1,27 @@
-import { Router } from "express";
 import express from "express";
-
+import * as controller from "./payment.controller.js";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
-import * as paymentController from "./payment.controller.js";
-import { handlePaystackWebhook } from "./paystackWebhook.controller.js";
 
-const paymentRouter = Router();
+const router = express.Router();
 
-
-paymentRouter.use(authMiddleware);
-
-paymentRouter.post(
-  "/orders/:orderId/initialize",
-  paymentController.initializePayment,
+// ORDER PAYMENT — POST /payments/order/:orderId/init
+router.post(
+  "/order/:orderId/init",
+  authMiddleware,
+  controller.initializePayment,
 );
 
-paymentRouter.get("/verify/:reference", paymentController.verifyPayment);
+router.post(
+  "/registration/:registrationId/init",
+  controller.initializeRegistrationPayment,
+);
 
-export default paymentRouter;
+// VERIFY — GET /payments/verify/:reference
+// Called by Paystack redirect and the frontend callback page
+router.get(
+  "/verify/:reference",
+  authMiddleware,
+  controller.verifyPayment,
+);
+
+export default router;

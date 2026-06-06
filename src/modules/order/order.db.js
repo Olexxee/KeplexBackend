@@ -23,31 +23,38 @@ export const findActiveCartForCheckout = async (userId, tx = prisma) => {
  * ORDER CREATE
  */
 export const createOrderFromCart = async (
-  { userId, payload, cart, totalAmount },
+  { userId, payload, address, cart, totalAmount },
   tx = prisma,
 ) => {
   return tx.order.create({
     data: {
       userId,
-      customerName: payload.customerName,
-      customerEmail: payload.customerEmail || null,
-      customerPhone: payload.customerPhone,
-      notes: payload.notes || null,
-      totalAmount,
-      status: "PENDING",
-      items: {
-        create: cart.items.map((cartItem) => {
-          const unitPrice = cartItem.unitPriceSnapshot;
 
-          return {
-            itemId: cartItem.itemId,
-            quantity: cartItem.quantity,
-            unitPriceSnapshot: unitPrice,
-            totalPrice: Number(unitPrice) * cartItem.quantity,
-          };
-        }),
+      customerName: address.fullName,
+      customerPhone: address.phone,
+
+      shippingLabel: address.label,
+      shippingStreet: address.addressLine,
+      shippingCity: address.city,
+      shippingState: address.state,
+      shippingCountry: address.country,
+
+      notes: payload.notes || null,
+
+      totalAmount,
+
+      status: "PENDING",
+
+      items: {
+        create: cart.items.map((cartItem) => ({
+          itemId: cartItem.itemId,
+          quantity: cartItem.quantity,
+          unitPriceSnapshot: cartItem.unitPriceSnapshot,
+          totalPrice: Number(cartItem.unitPriceSnapshot) * cartItem.quantity,
+        })),
       },
     },
+
     include: {
       items: {
         include: {
@@ -78,38 +85,46 @@ export const markCartAsCheckedOut = async (cartId, tx = prisma) => {
 /**
  * ORDERS LIST
  */
-export const findOrders = async ({ status, userId } = {}) => {
-  return prisma.order.findMany({
-    where: {
-      ...(status && { status }),
-      ...(userId && { userId }),
-    },
-    include: {
-      items: {
-        include: {
-          item: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              media: true,
+export const findOrders = async ({ status, userId, skip, take } = {}) => {
+  const where = {
+    ...(status && { status }),
+    ...(userId && { userId }),
+  };
+
+  return Promise.all([
+    prisma.order.findMany({
+      where,
+      skip,
+      take,
+      include: {
+        items: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                media: true,
+              },
             },
           },
         },
-      },
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          phone: true,
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
+
+    prisma.order.count({ where }),
+  ]);
 };
 
 /**
@@ -131,6 +146,9 @@ export const findOrderById = async (id) => {
           },
         },
       },
+
+      payments: true,
+
       user: {
         select: {
           id: true,

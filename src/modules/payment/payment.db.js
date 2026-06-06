@@ -1,51 +1,23 @@
 import { prisma } from "../../config/prisma.js";
 
-export const findOrderById = async (orderId) => {
-  return prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      payments: true,
-      user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-        },
-      },
-    },
-  });
-};
+export const createPayment = (data) => prisma.payment.create({ data });
 
-export const createPayment = async (data) => {
-  return prisma.payment.create({
-    data,
-  });
-};
-
-export const findPaymentByReference = async (reference) => {
-  return prisma.payment.findUnique({
+export const findPaymentByReference = (reference) =>
+  prisma.payment.findUnique({
     where: { reference },
-    include: {
-      order: true,
-    },
+    include: { order: true },
   });
-};
 
-export const updatePaymentByReference = async (reference, data) => {
-  return prisma.payment.update({
+export const updatePaymentByReference = (reference, data) =>
+  prisma.payment.update({
     where: { reference },
     data,
-    include: {
-      order: true,
-    },
+    include: { order: true },
   });
-};
 
-export const markOrderConfirmed = async (orderId) => {
-  return prisma.order.update({
+// Called by payment.service.js after a successful payment verification
+export const markOrderConfirmed = (orderId) =>
+  prisma.order.update({
     where: { id: orderId },
-    data: {
-      status: "CONFIRMED",
-    },
+    data: { status: "CONFIRMED" },
   });
-};
