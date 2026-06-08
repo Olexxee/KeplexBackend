@@ -22,23 +22,24 @@ export const deleteTrainingProgram = async (id, tx = prisma) => {
 export const findTrainingProgramById = async (id, tx = prisma) => {
   return tx.trainingProgram.findUnique({
     where: { id },
-    include: {
-      category: true,
-      media: true,
-    },
+  });
+};
+
+export const findTrainingProgramBySlug = async (slug, tx = prisma) => {
+  return tx.trainingProgram.findUnique({
+    where: { slug },
   });
 };
 
 export const listTrainingPrograms = async (options = {}, tx = prisma) => {
-  const { where, orderBy, take, include } = options;
+  const { where, skip, take, orderBy } = options;
 
   return tx.trainingProgram.findMany({
     where,
-    orderBy: orderBy ?? { displayOrder: "asc" },
+    skip,
     take,
-    include: include ?? {
-      category: true,
-      media: true,
+    orderBy: orderBy ?? {
+      displayOrder: "asc",
     },
   });
 };

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 import { uploadItemImages } from "../../middlewares/uploadMiddleware.js";
-import { processItemImages } from "../../middlewares/processItemImages.js";
+import { processTrainingImage } from "../../middlewares/processItemImages.js";
 import { parseMultipartJsonFields } from "../../middlewares/parseMultipartJson.js";
 import {validateQuery, validateBody, validateParams} from "../../middlewares/validateMiddleware.js";
 import * as itemController from "./item.controller.js";
@@ -33,7 +33,7 @@ itemRouter.post(
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   uploadItemImages,
   parseMultipartJsonFields(["features", "specifications"]), // before processItemImages
-  processItemImages,
+  processTrainingImage,
   validateBody(createItemSchema),
   itemController.createItem,
 );
@@ -44,7 +44,7 @@ itemRouter.patch(
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   validateParams(itemIdSchema),
   uploadItemImages,
-  processItemImages,
+  processTrainingImage,
   parseMultipartJsonFields(["features", "specifications"]),
   validateBody(updateItemSchema),
   itemController.updateItem,

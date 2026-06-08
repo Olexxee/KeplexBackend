@@ -6,6 +6,7 @@ const ALLOWED_KEYS = [
   "importation_settings",
   "pricing_rules",
   "store_settings",
+  "training_faq",
 ];
 
 export const getAllConfigs = async () => {
@@ -28,6 +29,7 @@ export const getAllConfigs = async () => {
     },
     training_programs:
       configs.find((c) => c.key === "training_programs")?.value ?? [],
+    training_faq: configs.find((c) => c.key === "training_faq")?.value ?? [],
   };
 };
 

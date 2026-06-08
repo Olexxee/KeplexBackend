@@ -3,6 +3,10 @@ import * as registrationDb from "./registration.db.js";
 import * as paymentService from "../payment/payment.service.js";
 import { findTrainingProgramById } from "../training-programs/trainingProgram.db.js";
 import {
+  REGISTRATION_STATUS,
+  REGISTRATION_STATUSES,
+} from "../../constants/registrationStatus.js";
+import {
   getPaginationParams,
   formatPaginatedResponse,
 } from "../../lib/pagination.js";
@@ -16,6 +20,11 @@ export const createRegistration = async ({
   email,
   phone,
 }) => {
+  const normalizedName = fullName?.trim();
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedPhone = phone?.trim();
+
+  // 1. Verify existence and status of the training program
   const training = await findTrainingProgramById(trainingProgramId);
 
   if (!training) {
@@ -26,27 +35,37 @@ export const createRegistration = async ({
     throw new BadRequestError("Training program is currently unavailable");
   }
 
-  // prevent duplicate registrations for the same email + program
+  if (!training.price || Number(training.price) <= 0) {
+    throw new BadRequestError("Training program price is invalid");
+  }
+
+  // 2. Prevent duplicate active registrations
   const existing = await registrationDb.findRegistrationByEmailAndProgram(
-    email.trim().toLowerCase(),
+    normalizedEmail,
     trainingProgramId,
   );
 
-  if (existing) {
+  const activeStatuses = [
+    REGISTRATION_STATUS.PENDING,
+    REGISTRATION_STATUS.PAID,
+  ];
+  if (existing && activeStatuses.includes(existing.status)) {
     throw new BadRequestError(
       "This email is already registered for this program",
     );
   }
 
+  // 3. Persist registration record using constant key
   const registration = await registrationDb.createRegistration({
     trainingProgramId,
-    fullName: fullName.trim(),
-    email: email.trim().toLowerCase(),
-    phone: phone.trim(),
-    status: "PENDING",
+    fullName: normalizedName,
+    email: normalizedEmail,
+    phone: normalizedPhone,
+    amount: training.price,
+    status: REGISTRATION_STATUS.PENDING,
   });
 
-  // immediately initialize payment and return authorization URL
+  // 4. Initialize transaction handler
   const payment = await paymentService.initializeRegistrationPayment({
     registrationId: registration.id,
   });
@@ -59,6 +78,7 @@ export const createRegistration = async ({
 
 export const getRegistrations = async (query) => {
   const { page = 1, limit = 20, status, trainingProgramId } = query;
+
   const { skip, take } = getPaginationParams(page, limit);
 
   const [data, total] = await registrationDb.listRegistrations({
@@ -68,7 +88,12 @@ export const getRegistrations = async (query) => {
     take,
   });
 
-  return formatPaginatedResponse({ data, total, page, limit });
+  return formatPaginatedResponse({
+    data,
+    total,
+    page,
+    limit,
+  });
 };
 
 export const getRegistrationById = async (id) => {
@@ -93,6 +118,11 @@ export const updateRegistrationStatus = async ({ id, status }) => {
   }
 
   const normalizedStatus = normalizeStatus(status);
+
+  // Dynamic array evaluation for inbound API validation payloads
+  if (!REGISTRATION_STATUSES.includes(normalizedStatus)) {
+    throw new BadRequestError("Invalid registration status");
+  }
 
   return registrationDb.updateRegistrationById(id, {
     status: normalizedStatus,

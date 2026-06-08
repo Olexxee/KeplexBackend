@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import dashboardRouter from "./modules/dashboard/dashboard.routes.js";
 import addressRouter from "./modules/address/address.routes.js";
 import paymentRouter from "./modules/payment/payment.routes.js";
+import webhookRouter from "./modules/payment/webhook/webhook.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import itemRouter from "./modules/item/item.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
@@ -16,6 +17,7 @@ import orderRouter from "./modules/order/order.routes.js";
 import adminRouter from "./modules/admin/admin.routes.js";
 import testimonialRouter from "./modules/testimonials/testimonialRoutes.js";
 import authRouter from "./modules/auth/auth.routes.js";
+import trainingRouter from "./modules/training-programs/trainingProgram.routes.js";
 import registrationRouter from "./modules/registration/registration.routes.js";
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
@@ -24,7 +26,7 @@ import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 
 export const app = express();
 
-// app.use("/api/payments", handlePaystackWebhook);
+app.use("/api/webhooks", webhookRouter);
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -71,6 +73,7 @@ app.use("/api/addresses", addressRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/admin", adminRouter); 
 app.use("/api/registrations", registrationRouter);
+app.use("/api/training-programs", trainingRouter);
 app.use("/api/business-config", configRouter);
 // app.use("/api/testimonials", testimonialRouter);
 app.use((req, res, next) => {

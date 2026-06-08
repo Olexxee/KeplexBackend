@@ -3,9 +3,9 @@ import { env } from "./config/env.js";
 import { prisma } from "./config/prisma.js";
 import "./workers/notification.worker.js";
 
-
 const startServer = async () => {
   try {
+    // 1. Establish database connection first
     await prisma.$connect();
     console.log("Database connected");
     app.listen(env.port, () => {
@@ -17,6 +17,7 @@ const startServer = async () => {
   }
 };
 
+// Fire startup lifecycle
 startServer();
 
 process.on("SIGINT", async () => {
