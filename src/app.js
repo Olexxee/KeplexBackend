@@ -31,6 +31,7 @@ app.use("/api/webhooks", webhookRouter);
 const allowedOrigins = [
   "http://localhost:5173",
   "https://keplexshopping.vercel.app",
+  ""
 ];
 
 app.use(

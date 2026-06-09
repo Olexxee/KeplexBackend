@@ -7,13 +7,19 @@ import * as authDb from "../modules/auth/auth.db.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
+    console.log("Cookies:", req.cookies);
+
     const token = req.cookies?.accessToken;
+
+    console.log("Access token exists:", !!token);
 
     if (!token) {
       throw new UnauthorizedError("Authentication token is required");
     }
 
     const decoded = jwt.verify(token, env.jwtSecret);
+
+    console.log("Decoded:", decoded);
 
     const user = await authDb.findUserById(decoded.userId);
 
@@ -29,6 +35,7 @@ export const authMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
-    next(new UnauthorizedError("Invalid or expired authentication token"));
+    console.error("AUTH ERROR:", error);
+    next(error);
   }
 };

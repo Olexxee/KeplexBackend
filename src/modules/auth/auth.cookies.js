@@ -1,33 +1,50 @@
-import { env } from "../../config/env.js";
 import {
   ACCESS_TOKEN_EXPIRES_IN_MS,
   REFRESH_TOKEN_EXPIRES_IN_MS,
 } from "./auth.constants.js";
 
-const cookieOptions = (env) => ({
+const isProduction =
+  process.env.RENDER || process.env.NODE_ENV === "production";
+
+const cookieOptions = {
   httpOnly: true,
-  secure: env.nodeEnv === "production",
-  sameSite: env.nodeEnv === "production" ? "none" : "lax",
+  secure: Boolean(isProduction),
+  sameSite: "none",
+  path: "/",
+};
+
+console.log({
+  NODE_ENV: process.env.NODE_ENV,
+  RENDER: process.env.RENDER,
+  isProduction,
+  cookieOptions,
 });
 
+
 export const setAccessTokenCookie = (res, token) => {
+  console.log("SETTING ACCESS COOKIE");
+  console.log("Access token length:", token.length);
+
   res.cookie("accessToken", token, {
-    ...cookieOptions(env),
+    ...cookieOptions,
     maxAge: ACCESS_TOKEN_EXPIRES_IN_MS,
   });
 };
 
 export const clearAccessTokenCookie = (res) => {
-  res.clearCookie("accessToken", cookieOptions(env));
+  res.clearCookie("accessToken", cookieOptions);
 };
 
 export const setRefreshTokenCookie = (res, token) => {
+  console.log("SETTING REFRESH COOKIE");
+  console.log("Refresh token length:", token.length);
+
   res.cookie("refreshToken", token, {
-    ...cookieOptions(env),
+    ...cookieOptions,
     maxAge: REFRESH_TOKEN_EXPIRES_IN_MS,
   });
 };
 
 export const clearRefreshTokenCookie = (res) => {
-  res.clearCookie("refreshToken", cookieOptions(env));
+  res.clearCookie("refreshToken", cookieOptions);
 };
