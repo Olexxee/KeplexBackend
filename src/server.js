@@ -1,7 +1,8 @@
 import { app } from "./app.js";
 import { env } from "./config/env.js";
 import { prisma } from "./config/prisma.js";
-import "./workers/notification.worker.js";
+import "./modules/notifications/notificationWorker.js";
+
 
 const startServer = async () => {
   try {

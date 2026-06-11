@@ -4,6 +4,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 
+
+// MODULES 
 import dashboardRouter from "./modules/dashboard/dashboard.routes.js";
 import addressRouter from "./modules/address/address.routes.js";
 import paymentRouter from "./modules/payment/payment.routes.js";
@@ -11,6 +13,7 @@ import webhookRouter from "./modules/payment/webhook/webhook.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import itemRouter from "./modules/item/item.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
+import notificationRouter from "./modules/notifications/notification.routes.js";
 import categoryRouter from "./modules/categories/category.routes.js";
 import configRouter from "./modules/business-config/businessConfig.routes.js";
 import orderRouter from "./modules/order/order.routes.js";
@@ -76,8 +79,9 @@ app.use("/api/admin", adminRouter);
 app.use("/api/registrations", registrationRouter);
 app.use("/api/training-programs", trainingRouter);
 app.use("/api/business-config", configRouter);
+app.use("/api/notifications", notificationRouter)
 // app.use("/api/testimonials", testimonialRouter);
-app.use((req, res, next) => {
-  next(new NotFoundError(`Route not found: ${req.originalUrl}`));
-  });
+// app.use((req, res, next) => {
+//   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
+//   });
   

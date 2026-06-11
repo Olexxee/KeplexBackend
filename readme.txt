@@ -42,3 +42,19 @@ input normalization
 4. Notification queue
 5. Public storefront APIs
 6. Frontend integration
+
+
+// How to send Notifications in other modules
+
+// modules/order/order.service.js
+import { enqueueNotification } from "../notifications/notification.queue.js";
+import { NOTIFICATION_JOBS } from "../notifications/notification.jobs.js";
+
+export const confirmOrder = async (orderId) => {
+  // ... your existing order logic
+
+  await enqueueNotification({
+    name: NOTIFICATION_JOBS.ORDER_CONFIRMED,
+    data: { order },
+  });
+};
