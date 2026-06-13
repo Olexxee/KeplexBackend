@@ -49,6 +49,7 @@ app.use(
         "http://localhost:5173", // Local development
         "https://keplexshopping.vercel.app",
         "http://127.0.0.1:5173",
+        "https://keplexregistration.vercel.app",
         // Production frontend
         env.FRONTEND_URL, // Dynamic URL from env file
       ].filter(Boolean); // Removes undefined/empty values safely
