@@ -21,43 +21,33 @@ import testimonialRouter from "./modules/testimonials/testimonialRoutes.js";
 import authRouter from "./modules/auth/auth.routes.js";
 import trainingRouter from "./modules/training-programs/trainingProgram.routes.js";
 import registrationRouter from "./modules/registration/registration.routes.js";
+import auditRouter from "./modules/audit/audit.routes.js";
+
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
-import auditRouter from "./modules/audit/audit.routes.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 
 export const app = express();
 
+// ── Webhook route FIRST — before any body parsers touch the stream ──
 app.use("/api/webhooks", webhookRouter);
 
+// ── CORS ──
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "https://keplexshopping.vercel.app",
-  "",
-];
+  "https://keplexregistration.vercel.app",
+  env.FRONTEND_URL,
+].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // 1. Allow tools like Postman, mobile apps, or server-to-server requests (no origin)
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      // 2. Setup your allowed domains list cleanly
-      const allowedOrigins = [
-        "http://localhost:5173", // Local development
-        "https://keplexshopping.vercel.app",
-        "http://127.0.0.1:5173",
-        "https://keplexregistration.vercel.app",
-        // Production frontend
-        env.FRONTEND_URL, // Dynamic URL from env file
-      ].filter(Boolean); // Removes undefined/empty values safely
-
+      if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        // Log explicitly to your server console to diagnose exactly what origin is being blocked
         console.error(
           `[CORS Blocked]: Request from origin ${origin} was denied.`,
         );
@@ -68,22 +58,24 @@ app.use(
   }),
 );
 
+// ── Global middleware ──
 app.use(helmet());
 app.use(morgan("dev"));
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
+// ── Health check ──
 app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "Organisation backend is running",
+    message: "Keplex backend is running",
   });
 });
 
-// --- ROUTES FIRST ---
+// ── Routes ──
 app.use("/api/auth", authRouter);
-app.use(["/api/organisation", "/api/organisation/"], organisationRouter);
+app.use("/api/organisation", organisationRouter);
 app.use("/api/category", categoryRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/items", itemRouter);
@@ -97,12 +89,12 @@ app.use("/api/registrations", registrationRouter);
 app.use("/api/training-programs", trainingRouter);
 app.use("/api/business-config", configRouter);
 app.use("/api/notifications", notificationRouter);
-app.use("/api/testimonial", testimonialRouter)
+app.use("/api/testimonial", testimonialRouter);
 
-// Uncomment this catch-all fallback if needed:
+// ── 404 handler ──
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
 });
 
-// --- ERROR MIDDLEWARE GOES ABSOLUTE LAST ---
+// ── Error middleware — must be last ──
 app.use(errorMiddleware);

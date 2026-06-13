@@ -35,3 +35,37 @@ export const processItemImages = async (req, res, next) => {
   }
 };
 
+export const processSingleTrainingImage = async (req, res, next) => {
+  try {
+    console.log("processSingleTrainingImage called");
+    console.log(
+      "req.file:",
+      req.file?.originalname,
+      req.file?.mimetype,
+      req.file?.size,
+    );
+
+    if (!req.file) {
+      console.log("No file found, skipping upload");
+      return next();
+    }
+
+    const result = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "keplex-trainings",
+    });
+
+    console.log("Cloudinary result:", result);
+
+    req.uploadedFile = {
+      url: result.url,
+      publicId: result.publicId,
+      mimeType: req.file.mimetype,
+      bytes: result.bytes,
+    };
+
+    next();
+  } catch (err) {
+    console.error("processSingleTrainingImage error:", err.message);
+    next(err);
+  }
+};

@@ -22,6 +22,9 @@ export const deleteTrainingProgram = async (id, tx = prisma) => {
 export const findTrainingProgramById = async (id, tx = prisma) => {
   return tx.trainingProgram.findUnique({
     where: { id },
+    include: {
+      media: true,
+    },
   });
 };
 

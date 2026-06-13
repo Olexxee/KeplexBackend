@@ -5,7 +5,10 @@ import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 import { validateBody } from "../../middlewares/validateMiddleware.js";
 import { createTrainingSchema } from "./trainingProgram.validation.js";
 import { uploadTrainingImage } from "../../middlewares/uploadMiddleware.js";
-import { processItemImages } from "../../middlewares/processItemImages.js";
+import {
+  processItemImages,
+  processSingleTrainingImage,
+} from "../../middlewares/processItemImages.js";
 
 const trainingRouter = express.Router();
 
@@ -64,7 +67,7 @@ trainingRouter.post(
   authMiddleware,
   roleMiddleware("ADMIN", "SUPER_ADMIN"),
   uploadTrainingImage,
-  processItemImages,
+  processSingleTrainingImage, // 👈 Swapped out processItemImages here
   controller.uploadProgramMedia,
 );
 
