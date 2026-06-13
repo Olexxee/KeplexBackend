@@ -8,20 +8,22 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  fullName      String
-  email         String         @unique
-  phone         String?
-  password      String
-  role          UserRole       @default(CUSTOMER)
-  status        UserStatus     @default(ACTIVE)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  addresses     Address[]
-  auditLogs     AuditLog[]
-  carts         Cart[]
-  orders        Order[]
-  refreshTokens RefreshToken[]
+  id                      String                   @id @default(cuid())
+  fullName                String
+  email                   String                   @unique
+  phone                   String?
+  password                String
+  role                    UserRole                 @default(CUSTOMER)
+  status                  UserStatus               @default(ACTIVE)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  addresses               Address[]
+  auditLogs               AuditLog[]
+  carts                   Cart[]
+  orders                  Order[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  refreshTokens           RefreshToken[]
 }
 
 model RefreshToken {
@@ -247,25 +249,25 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
 }
 
 model NotificationPreference {
-  id        String   @id @default(cuid())
-  userId    String   @unique
+  id     String @id @default(cuid())
+  userId String @unique
 
-  orderEmails            Boolean @default(true)
-  orderStatusEmails      Boolean @default(true)
-  trainingEmails         Boolean @default(true)
-  marketingEmails        Boolean @default(false)
+  orderEmails       Boolean @default(true)
+  orderStatusEmails Boolean @default(true)
+  trainingEmails    Boolean @default(true)
+  marketingEmails   Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Testimonial {
