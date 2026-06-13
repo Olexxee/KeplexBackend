@@ -1,22 +1,37 @@
 import { uploadBufferToCloudinary } from "../config/cloudinaryService.js";
 
-export const processTrainingImage = async (req, res, next) => {
+// Process multiple item images (Handles req.files from multer .array())
+export const processItemImages = async (req, res, next) => {
   try {
-    if (!req.file) return next();
+    // If no files were uploaded via multer, just proceed
+    if (!req.files || req.files.length === 0) return next();
 
-    const result = await uploadBufferToCloudinary(req.file.buffer, {
-      folder: "keplex-training",
+    // Loop through all uploaded file buffers and send them to Cloudinary
+    const uploadPromises = req.files.map(async (file) => {
+      const result = await uploadBufferToCloudinary(file.buffer, {
+        folder: "keplex-items", // Organized folder for store items
+      });
+
+      return {
+        url: result.url,
+        publicId: result.publicId,
+        mimeType: file.mimetype,
+        bytes: result.bytes,
+        format: result.format, // optional extras
+        width: result.width,
+        height: result.height,
+      };
     });
 
-    req.uploadedFile = {
-      url: result.url,
-      publicId: result.publicId,
-      mimeType: req.file.mimetype,
-      bytes: result.bytes,
-    };
+    // Wait for all uploads to complete successfully
+    const uploadedImages = await Promise.all(uploadPromises);
+
+    // CRITICAL: Attach to req.body.images so validation & service find it!
+    req.body.images = uploadedImages;
 
     next();
   } catch (err) {
     next(err);
   }
 };
+

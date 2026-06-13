@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 import { uploadItemImages } from "../../middlewares/uploadMiddleware.js";
-import { processTrainingImage } from "../../middlewares/processItemImages.js";
+import { processItemImages } from "../../middlewares/processItemImages.js";
 import { parseMultipartJsonFields } from "../../middlewares/parseMultipartJson.js";
 import {validateQuery, validateBody, validateParams} from "../../middlewares/validateMiddleware.js";
 import * as itemController from "./item.controller.js";
@@ -29,25 +29,25 @@ itemRouter.get(
 
 itemRouter.post(
   "/",
-  authMiddleware,
-  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
-  uploadItemImages,
-  parseMultipartJsonFields(["features", "specifications"]), // before processItemImages
-  processTrainingImage,
-  validateBody(createItemSchema),
-  itemController.createItem,
+  authMiddleware, //
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"), //
+  uploadItemImages, // Populates req.files
+  parseMultipartJsonFields(["features", "specifications"]), //
+  processItemImages, // 👈 SWAPPED: Converts req.files to req.body.images
+  validateBody(createItemSchema), // Validates req.body.images
+  itemController.createItem, //
 );
 
 itemRouter.patch(
   "/:id",
-  authMiddleware,
-  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
-  validateParams(itemIdSchema),
-  uploadItemImages,
-  processTrainingImage,
-  parseMultipartJsonFields(["features", "specifications"]),
-  validateBody(updateItemSchema),
-  itemController.updateItem,
+  authMiddleware, //
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"), //
+  validateParams(itemIdSchema), //
+  uploadItemImages, //
+  parseMultipartJsonFields(["features", "specifications"]), //
+  processItemImages, // 👈 SWAPPED HERE TOO
+  validateBody(updateItemSchema), //
+  itemController.updateItem, //
 );
 
 itemRouter.delete(

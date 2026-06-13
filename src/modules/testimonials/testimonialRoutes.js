@@ -3,40 +3,40 @@ import * as testimonialController from "./testimonialController.js";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 
-const router = express.Router();
+const testimonialRouter = express.Router();
 
-router.get("/", testimonialController.getPublicTestimonials);
+testimonialRouter.get("/", testimonialController.getPublicTestimonials);
 
-router.post("/", testimonialController.createTestimonial);
+testimonialRouter.post("/", testimonialController.createTestimonial);
 
-router.get(
+testimonialRouter.get(
   "/admin",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   testimonialController.getAdminTestimonials,
 );
 
-router.get(
+testimonialRouter.get(
   "/admin/stats",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   testimonialController.getTestimonialStats,
 );
 
-router.patch(
+testimonialRouter.patch(
   "/admin/:id/status",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN"),
   testimonialController.updateTestimonialStatus,
 );
 
-router.delete(
+testimonialRouter.delete(
   "/admin/:id",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN"),
   testimonialController.deleteTestimonial,
 );
 
-const testimonialRouter = router;
+
 
 export default testimonialRouter;
