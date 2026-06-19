@@ -18,18 +18,22 @@ const formatCart = (cart) => {
     userId: cart.userId,
 
     items: items.map((cartItem) => {
-      const currentPrice = toNumber(cartItem.item.price);
+      const { item } = cartItem;
+      const currentPrice = toNumber(item.price);
 
       return {
         id: cartItem.id,
         itemId: cartItem.itemId,
         quantity: cartItem.quantity,
+
         unitPrice: currentPrice,
         lineTotal: currentPrice * cartItem.quantity,
-        availableStock: cartItem.item.stock,
-        inStock: cartItem.item.stock >= cartItem.quantity,
-        unavailable: cartItem.item.status !== "ACTIVE",
-        item: cartItem.item,
+
+        availableStock: item.stock,
+        inStock: item.stock >= cartItem.quantity,
+        unavailable: item.status !== "ACTIVE",
+
+        item,
       };
     }),
 

@@ -17,6 +17,7 @@ export const findActiveCartByUserId = async (userId) => {
       items: {
         select: {
           id: true,
+          itemId: true,
           quantity: true,
 
           item: {
@@ -30,7 +31,6 @@ export const findActiveCartByUserId = async (userId) => {
 
               media: {
                 take: 1,
-
                 select: {
                   id: true,
                   url: true,
