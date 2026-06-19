@@ -9,23 +9,34 @@ const formatCart = (cart) => {
   const items = cart.items || [];
 
   const subtotal = items.reduce((sum, cartItem) => {
-    return sum + toNumber(cartItem.unitPriceSnapshot) * cartItem.quantity;
+    return sum + toNumber(cartItem.item.price) * cartItem.quantity;
   }, 0);
 
   return {
     id: cart.id,
     status: cart.status,
     userId: cart.userId,
-    items: items.map((cartItem) => ({
-      id: cartItem.id,
-      itemId: cartItem.itemId,
-      quantity: cartItem.quantity,
-      unitPriceSnapshot: toNumber(cartItem.unitPriceSnapshot),
-      lineTotal: toNumber(cartItem.unitPriceSnapshot) * cartItem.quantity,
-      item: cartItem.item,
-    })),
+
+    items: items.map((cartItem) => {
+      const currentPrice = toNumber(cartItem.item.price);
+
+      return {
+        id: cartItem.id,
+        itemId: cartItem.itemId,
+        quantity: cartItem.quantity,
+        unitPrice: currentPrice,
+        lineTotal: currentPrice * cartItem.quantity,
+        availableStock: cartItem.item.stock,
+        inStock: cartItem.item.stock >= cartItem.quantity,
+        unavailable: cartItem.item.status !== "ACTIVE",
+        item: cartItem.item,
+      };
+    }),
+
     subtotal,
+
     totalItems: items.reduce((sum, cartItem) => sum + cartItem.quantity, 0),
+
     createdAt: cart.createdAt,
     updatedAt: cart.updatedAt,
   };
@@ -61,6 +72,9 @@ const ensureItemCanBeAdded = async ({ itemId, quantity }) => {
 
 export const getCart = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
+  const activeItems = cart.items.filter(
+    (cartItem) => cartItem.item.status === "ACTIVE",
+  );
   return formatCart(cart);
 };
 
