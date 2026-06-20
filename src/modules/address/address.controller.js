@@ -36,6 +36,15 @@ export const remove = asyncWrapper(async (req, res) => {
   });
 });
 
+export const setDefault = asyncWrapper(async (req, res) => {
+  const data = await service.setDefault(req.user.id, req.params.id);
+
+  return successResponse({
+    res,
+    data,
+  });
+});
+
 export const updateMe = asyncWrapper(async (req, res) => {
   const data = await authService.updateMe(req.user.id, req.body);
 
