@@ -52,3 +52,15 @@ export const updateRegistrationStatus = asyncWrapper(async (req, res) => {
     data: registration,
   });
 });
+
+export const verifyRegistrationPayment = asyncWrapper(async (req, res) => {
+  const result = await registrationService.verifyRegistrationPayment(
+    req.params.reference,
+  );
+
+  return successResponse({
+    res,
+    message: "Registration payment verified",
+    data: result,
+  });
+});

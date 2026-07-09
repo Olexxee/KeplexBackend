@@ -1,7 +1,7 @@
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
 import * as registrationDb from "./registration.db.js";
-import * as paymentService from "../payment/payment.service.js";
 import { findTrainingProgramById } from "../training-programs/trainingProgram.db.js";
+import * as registrationPaymentService from "./registrationPayment.service.js";
 import {
   REGISTRATION_STATUS,
   REGISTRATION_STATUSES,
@@ -66,9 +66,10 @@ export const createRegistration = async ({
   });
 
   // 4. Initialize transaction handler
-  const payment = await paymentService.initializeRegistrationPayment({
-    registrationId: registration.id,
-  });
+  const payment =
+    await registrationPaymentService.initializeRegistrationPayment(
+      registration.id,
+    );
 
   return {
     registration,
@@ -127,4 +128,19 @@ export const updateRegistrationStatus = async ({ id, status }) => {
   return registrationDb.updateRegistrationById(id, {
     status: normalizedStatus,
   });
+};
+
+export const verifyRegistrationPayment = async (reference) => {
+  const registration =
+    await registrationDb.findRegistrationByPaymentRef(reference);
+
+  if (!registration) {
+    throw new NotFoundError("Registration not found");
+  }
+
+  return {
+    reference,
+    status: registration.status,
+    paidAt: registration.paidAt,
+  };
 };

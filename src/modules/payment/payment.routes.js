@@ -20,7 +20,6 @@ router.post(
 // Called by Paystack redirect and the frontend callback page
 router.get(
   "/verify/:reference",
-  authMiddleware,
   controller.verifyPayment,
 );
 

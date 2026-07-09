@@ -1,4 +1,39 @@
+// modules/cart/cart.db.js
 import { prisma } from "../../config/prisma.js";
+
+const cartInclude = {
+  items: {
+    include: {
+      variant: {
+        include: {
+          product: {
+            include: {
+              brand: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  user: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+    },
+  },
+};
 
 export const findActiveCartByUserId = async (userId) => {
   return prisma.cart.findFirst({
@@ -6,34 +41,135 @@ export const findActiveCartByUserId = async (userId) => {
       userId,
       status: "ACTIVE",
     },
+    include: cartInclude,
+  });
+};
 
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
+export const findCartById = async (cartId) => {
+  return prisma.cart.findUnique({
+    where: { id: cartId },
+    include: cartInclude,
+  });
+};
 
-      items: {
-        select: {
-          id: true,
-          itemId: true,
-          quantity: true,
+export const createCart = async (userId) => {
+  return prisma.cart.create({
+    data: {
+      userId,
+      status: "ACTIVE",
+    },
+    include: cartInclude,
+  });
+};
 
-          item: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              price: true,
-              stock: true,
-              status: true,
+export const findCartItem = async ({ cartId, variantId }) => {
+  return prisma.cartItem.findUnique({
+    where: {
+      cartId_variantId: {
+        cartId,
+        variantId,
+      },
+    },
+    include: {
+      variant: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+};
 
-              media: {
-                take: 1,
+export const createCartItem = async ({
+  cartId,
+  variantId,
+  quantity,
+  unitPriceSnapshot,
+}) => {
+  return prisma.cartItem.create({
+    data: {
+      cartId,
+      variantId,
+      quantity,
+      unitPriceSnapshot,
+    },
+    include: {
+      variant: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+};
+
+export const updateCartItemQuantity = async ({
+  cartId,
+  variantId,
+  quantity,
+}) => {
+  return prisma.cartItem.update({
+    where: {
+      cartId_variantId: {
+        cartId,
+        variantId,
+      },
+    },
+    data: {
+      quantity,
+    },
+    include: {
+      variant: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+};
+
+export const deleteCartItem = async ({ cartId, variantId }) => {
+  return prisma.cartItem.delete({
+    where: {
+      cartId_variantId: {
+        cartId,
+        variantId,
+      },
+    },
+    include: {
+      variant: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+};
+
+export const clearCartItems = async (cartId) => {
+  return prisma.cartItem.deleteMany({
+    where: { cartId },
+  });
+};
+
+export const getCartItemsWithDetails = async (cartId) => {
+  return prisma.cartItem.findMany({
+    where: { cartId },
+    include: {
+      variant: {
+        include: {
+          product: {
+            include: {
+              brand: {
                 select: {
                   id: true,
-                  url: true,
+                  name: true,
+                },
+              },
+              category: {
+                select: {
+                  id: true,
+                  name: true,
                 },
               },
             },
@@ -44,69 +180,16 @@ export const findActiveCartByUserId = async (userId) => {
   });
 };
 
-export const createCart = async (userId) => {
-  return prisma.cart.create({
-    data: {
-      userId,
-      status: "ACTIVE",
-    },
+export const updateCartStatus = async (cartId, status) => {
+  return prisma.cart.update({
+    where: { id: cartId },
+    data: { status },
+    include: cartInclude,
   });
 };
 
-export const findCartItem = async ({ cartId, itemId }) => {
-  return prisma.cartItem.findUnique({
-    where: {
-      cartId_itemId: {
-        cartId,
-        itemId,
-      },
-    },
-  });
-};
-
-export const createCartItem = async ({
-  cartId,
-  itemId,
-  quantity,
-  unitPriceSnapshot,
-}) => {
-  return prisma.cartItem.create({
-    data: {
-      cartId,
-      itemId,
-      quantity,
-      unitPriceSnapshot,
-    },
-  });
-};
-
-export const updateCartItemQuantity = async ({ cartId, itemId, quantity }) => {
-  return prisma.cartItem.update({
-    where: {
-      cartId_itemId: {
-        cartId,
-        itemId,
-      },
-    },
-    data: {
-      quantity,
-    },
-  });
-};
-
-export const deleteCartItem = async ({ cartId, itemId }) => {
-  return prisma.cartItem.delete({
-    where: {
-      cartId_itemId: {
-        cartId,
-        itemId,
-      },
-    },
-  });
-};
-
-export const clearCartItems = async (cartId) => {
-  return prisma.cartItem.deleteMany({
-    where: { cartId },
+export const deleteCartsByUserId = async (userId) => {
+  return prisma.cart.deleteMany({
+    where: { userId },
   });
 };

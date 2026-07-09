@@ -8,7 +8,7 @@ import cookieParser from "cookie-parser";
 import dashboardRouter from "./modules/dashboard/dashboard.routes.js";
 import addressRouter from "./modules/address/address.routes.js";
 import paymentRouter from "./modules/payment/payment.routes.js";
-import webhookRouter from "./modules/payment/webhook/webhook.routes.js";
+import webhookRouter from "./webhook/webhook.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import itemRouter from "./modules/item/item.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
@@ -22,10 +22,10 @@ import authRouter from "./modules/auth/auth.routes.js";
 import trainingRouter from "./modules/training-programs/trainingProgram.routes.js";
 import registrationRouter from "./modules/registration/registration.routes.js";
 import auditRouter from "./modules/audit/audit.routes.js";
-
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
+
 
 export const app = express();
 

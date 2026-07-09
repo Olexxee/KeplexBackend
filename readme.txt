@@ -58,3 +58,161 @@ export const confirmOrder = async (orderId) => {
     data: { order },
   });
 };
+
+Cart
+
+items[]
+
+localSummary
+
+importSummary
+
+subtotal
+
+shipping
+
+total
+
+backend/
+├── src/
+│   ├── modules/
+│   │   ├── products/ (NEW - replaces items)
+│   │   │   ├── product.controller.js 🆕
+│   │   │   ├── product.service.js 🆕
+│   │   │   ├── product.db.js 🆕
+│   │   │   ├── product.routes.js 🆕
+│   │   │   └── product.validation.js 🆕
+│   │   │
+│   │   ├── variants/ (NEW)
+│   │   │   ├── variant.controller.js 🆕
+│   │   │   ├── variant.service.js 🆕
+│   │   │   ├── variant.db.js 🆕
+│   │   │   ├── variant.routes.js 🆕
+│   │   │   ├── variant.validation.js 🆕
+│   │   │   └── sku.generator.js 🆕
+│   │   │
+│   │   ├── brands/ (NEW)
+│   │   │   ├── brand.controller.js 🆕
+│   │   │   ├── brand.service.js 🆕
+│   │   │   ├── brand.db.js 🆕
+│   │   │   ├── brand.routes.js 🆕
+│   │   │   └── brand.validation.js 🆕
+│   │   │
+│   │   ├── collections/ (NEW)
+│   │   │   ├── collection.controller.js 🆕
+│   │   │   ├── collection.service.js 🆕
+│   │   │   ├── collection.db.js 🆕
+│   │   │   ├── collection.routes.js 🆕
+│   │   │   └── collection.validation.js 🆕
+│   │   │
+│   │   ├── shipping/ (NEW)
+│   │   │   ├── shipping.controller.js 🆕
+│   │   │   ├── shipping.service.js 🆕
+│   │   │   ├── shipping.db.js 🆕
+│   │   │   ├── shipping.routes.js 🆕
+│   │   │   ├── shipping.validation.js 🆕
+│   │   │   ├── shipping.calculator.js 🆕
+│   │   │   ├── cbm.calculator.js 🆕 (CRITICAL FOR SEA FREIGHT)
+│   │   │   └── shipping.config.js 🆕
+│   │   │
+│   │   ├── fulfillment/ (NEW)
+│   │   │   ├── fulfillment.controller.js 🆕
+│   │   │   ├── fulfillment.service.js 🆕
+│   │   │   ├── fulfillment.db.js 🆕
+│   │   │   ├── fulfillment.routes.js 🆕
+│   │   │   ├── fulfillment.validation.js 🆕
+│   │   │   ├── order.splitter.js 🆕
+│   │   │   └── warehouse.manager.js 🆕
+│   │   │
+│   │   ├── inventory/ (NEW)
+│   │   │   ├── inventory.controller.js 🆕
+│   │   │   ├── inventory.service.js 🆕
+│   │   │   ├── inventory.db.js 🆕
+│   │   │   ├── inventory.routes.js 🆕
+│   │   │   ├── inventory.validation.js 🆕
+│   │   │   ├── stock.adjustment.js 🆕
+│   │   │   └── lowstock.alert.js 🆕
+│   │   │
+│   │   ├── promotions/ (NEW)
+│   │   │   ├── promotions.controller.js 🆕
+│   │   │   ├── promotions.service.js 🆕
+│   │   │   ├── promotions.db.js 🆕
+│   │   │   ├── promotions.routes.js 🆕
+│   │   │   ├── promotions.validation.js 🆕
+│   │   │   ├── coupon.validator.js 🆕
+│   │   │   └── discount.engine.js 🆕
+│   │   │
+│   │   ├── cms/ (NEW)
+│   │   │   ├── cms.controller.js 🆕
+│   │   │   ├── cms.service.js 🆕
+│   │   │   ├── cms.db.js 🆕
+│   │   │   ├── cms.routes.js 🆕
+│   │   │   ├── cms.validation.js 🆕
+│   │   │   ├── banner.manager.js 🆕
+│   │   │   └── homepage.builder.js 🆕
+│   │   │
+│   │   ├── wishlist/ (NEW)
+│   │   │   ├── wishlist.controller.js 🆕
+│   │   │   ├── wishlist.service.js 🆕
+│   │   │   ├── wishlist.db.js 🆕
+│   │   │   ├── wishlist.routes.js 🆕
+│   │   │   └── wishlist.validation.js 🆕
+│   │   │
+│   │   ├── reviews/ (NEW)
+│   │   │   ├── review.controller.js 🆕
+│   │   │   ├── review.service.js 🆕
+│   │   │   ├── review.db.js 🆕
+│   │   │   ├── review.routes.js 🆕
+│   │   │   ├── review.validation.js 🆕
+│   │   │   └── review.moderation.js 🆕
+│   │   │
+│   │   ├── reports/ (NEW)
+│   │   │   ├── reports.controller.js 🆕
+│   │   │   ├── reports.service.js 🆕
+│   │   │   ├── reports.db.js 🆕
+│   │   │   ├── reports.routes.js 🆕
+│   │   │   ├── reports.validation.js 🆕
+│   │   │   ├── revenue.report.js 🆕
+│   │   │   ├── sales.report.js 🆕
+│   │   │   └── inventory.report.js 🆕
+│   │   │
+│   │   ├── dashboard/ (NEW)
+│   │   │   ├── dashboard.controller.js 🆕
+│   │   │   ├── dashboard.service.js 🆕
+│   │   │   ├── dashboard.db.js 🆕
+│   │   │   └── dashboard.routes.js 🆕
+│   │   │
+│   │   ├── notifications/ (NEW)
+│   │   │   ├── notification.controller.js 🆕
+│   │   │   ├── notification.service.js 🆕
+│   │   │   ├── notification.db.js 🆕
+│   │   │   ├── notification.routes.js 🆕
+│   │   │   ├── email.service.js 🆕
+│   │   │   └── sms.service.js 🆕
+│   │   │
+│   │   └── integrations/ (NEW)
+│   │       ├── dhl/
+│   │       │   ├── dhl.service.js 🆕
+│   │       │   └── dhl.config.js 🆕
+│   │       ├── fedex/
+│   │       │   ├── fedex.service.js 🆕
+│   │       │   └── fedex.config.js 🆕
+│   │       └── sea-freight/
+│   │           ├── seafreight.service.js 🆕
+│   │           ├── seafreight.config.js 🆕
+│   │           └── cbm.calculator.js 🆕 (CRITICAL)
+│   │
+│   ├── jobs/ (NEW - for background tasks)
+│   │   ├── lowstock.job.js 🆕
+│   │   ├── order.timeout.job.js 🆕
+│   │   ├── flashsale.job.js 🆕
+│   │   └── report.generator.job.js 🆕
+│   │
+│   └── webhooks/ (NEW)
+│       ├── paystack.webhook.js 🆕
+│       ├── shipping.webhook.js 🆕
+│       └── webhook.handler.js 🆕
+
+npx prisma migrate dev --name add_product_variants_cbm
+npx prisma migrate dev --name add_shipping_models
+npx prisma migrate dev --name add_fulfillment_models

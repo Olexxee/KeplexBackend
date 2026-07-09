@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import { asyncWrapper } from "../../../lib/asyncWrapper.js";
-import {successResponse} from "../../../lib/response.js";
+import { asyncWrapper } from "../lib/asyncWrapper.js";
+import {successResponse} from "../lib/response.js";
 import * as webhookService from "./webhook.service.js";
 
 export const paystackWebhook = asyncWrapper(async (req, res) => {

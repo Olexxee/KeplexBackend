@@ -7,14 +7,25 @@ const registrationRouter = express.Router();
 
 // ─────────────────────────────────────────
 // PUBLIC
-// creates registration + initializes payment in one shot
-// returns { registration, payment: { reference, authorizationUrl } }
 // ─────────────────────────────────────────
+
+// POST /registrations
+// Creates registration + initializes Paystack payment in one shot
+// Returns { registration, payment: { reference, authorizationUrl } }
 registrationRouter.post("/", registrationController.createRegistration);
+
+// GET /registrations/verify/:reference
+// Unauthenticated — used for post-payment redirect confirmation
+registrationRouter.get(
+  "/verify/:reference",
+  registrationController.verifyRegistrationPayment,
+);
 
 // ─────────────────────────────────────────
 // ADMIN
 // ─────────────────────────────────────────
+
+// GET /registrations
 registrationRouter.get(
   "/",
   authMiddleware,
@@ -22,6 +33,7 @@ registrationRouter.get(
   registrationController.getRegistrations,
 );
 
+// GET /registrations/stats
 registrationRouter.get(
   "/stats",
   authMiddleware,
@@ -29,6 +41,7 @@ registrationRouter.get(
   registrationController.getRegistrationStats,
 );
 
+// GET /registrations/:id
 registrationRouter.get(
   "/:id",
   authMiddleware,
@@ -36,6 +49,7 @@ registrationRouter.get(
   registrationController.getRegistrationById,
 );
 
+// PATCH /registrations/:id/status
 registrationRouter.patch(
   "/:id/status",
   authMiddleware,

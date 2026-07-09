@@ -69,3 +69,61 @@ export const processSingleTrainingImage = async (req, res, next) => {
     next(err);
   }
 };
+
+export const processMultipleUploads =
+  ({ folder, bodyField = "images" }) =>
+  async (req, res, next) => {
+    try {
+      if (!req.files?.length) return next();
+
+      const uploads = await Promise.all(
+        req.files.map(async (file) => {
+          const result = await uploadBufferToCloudinary(file.buffer, {
+            folder,
+          });
+
+          return {
+            url: result.url,
+            publicId: result.publicId,
+            mimeType: file.mimetype,
+            bytes: result.bytes,
+            format: result.format,
+            width: result.width,
+            height: result.height,
+          };
+        }),
+      );
+
+      req.body[bodyField] = uploads;
+
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+export const processSingleUpload =
+  ({ folder, requestField = "uploadedFile" }) =>
+  async (req, res, next) => {
+    try {
+      if (!req.file) return next();
+
+      const result = await uploadBufferToCloudinary(req.file.buffer, {
+        folder,
+      });
+
+      req[requestField] = {
+        url: result.url,
+        publicId: result.publicId,
+        mimeType: req.file.mimetype,
+        bytes: result.bytes,
+        format: result.format,
+        width: result.width,
+        height: result.height,
+      };
+
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
