@@ -1,5 +1,5 @@
+// modules/orders/order.routes.js
 import { Router } from "express";
-
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 import {
@@ -12,26 +12,43 @@ import {
   checkoutSchema,
   updateOrderStatusSchema,
   orderIdSchema,
+  orderNumberSchema,
   getMyOrdersQuerySchema,
   getAllOrdersQuerySchema,
+  updateCBMSchema,
 } from "./order.validation.js";
 
 const orderRouter = Router();
 
 orderRouter.use(authMiddleware);
 
+// Checkout
 orderRouter.post(
   "/checkout",
   validateBody(checkoutSchema),
   orderController.checkout,
 );
 
+// Customer routes
 orderRouter.get(
   "/me",
   validateQuery(getMyOrdersQuerySchema),
   orderController.getMyOrders,
 );
 
+orderRouter.get(
+  "/me/timeline/:id",
+  validateParams(orderIdSchema),
+  orderController.getOrderTimeline,
+);
+
+orderRouter.get(
+  "/by-number/:orderNumber",
+  validateParams(orderNumberSchema),
+  orderController.getOrderByOrderNumber,
+);
+
+// Admin routes
 orderRouter.get(
   "/",
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
@@ -40,9 +57,27 @@ orderRouter.get(
 );
 
 orderRouter.get(
+  "/metrics",
+  roleMiddleware("SUPER_ADMIN", "ADMIN"),
+  orderController.getOrderMetrics,
+);
+
+orderRouter.get(
+  "/fulfillment/:fulfillmentType",
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  orderController.getOrdersByFulfillmentType,
+);
+
+orderRouter.get(
   "/:id",
   validateParams(orderIdSchema),
   orderController.getOrderById,
+);
+
+orderRouter.get(
+  "/:id/timeline",
+  validateParams(orderIdSchema),
+  orderController.getOrderTimeline,
 );
 
 orderRouter.patch(
@@ -51,6 +86,14 @@ orderRouter.patch(
   validateParams(orderIdSchema),
   validateBody(updateOrderStatusSchema),
   orderController.updateOrderStatus,
+);
+
+orderRouter.patch(
+  "/:id/cbm",
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  validateParams(orderIdSchema),
+  validateBody(updateCBMSchema),
+  orderController.updateOrderCBM,
 );
 
 export default orderRouter;

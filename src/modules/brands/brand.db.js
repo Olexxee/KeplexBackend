@@ -1,4 +1,3 @@
-// modules/brands/brand.db.js
 import { prisma } from "../../config/prisma.js";
 
 export const createBrand = (data) => {

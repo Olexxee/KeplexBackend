@@ -22,6 +22,9 @@ import authRouter from "./modules/auth/auth.routes.js";
 import trainingRouter from "./modules/training-programs/trainingProgram.routes.js";
 import registrationRouter from "./modules/registration/registration.routes.js";
 import auditRouter from "./modules/audit/audit.routes.js";
+import productRouter from "./modules/products/product.routes.js";
+import reviewRouter from "./modules/reviews/review.routes.js";
+import wishlistRouter from "./modules/wishlist/wishlist.routes.js";
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
@@ -90,6 +93,9 @@ app.use("/api/training-programs", trainingRouter);
 app.use("/api/business-config", configRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/testimonial", testimonialRouter);
+app.use("/api/products", productRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/api/wishlist", wishlistRouter);
 
 // ── 404 handler ──
 app.use((req, res, next) => {

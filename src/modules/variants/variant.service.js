@@ -1,158 +1,172 @@
 // modules/variants/variant.service.js
-import {
-  BadRequestError,
-  NotFoundError,
-  ConflictError,
-} from "../../classes/errorClasses.js";
-import { SKUGenerator } from "./sku.generator.js";
+import { ConflictError, NotFoundError } from "../../classes/errorClasses.js";
 import * as variantDb from "./variant.db.js";
 import * as productDb from "../products/product.db.js";
-import { CBMCalculator } from "../shipping/cbm.calculator.js";
+import { VariantFactory } from "./variant.factory.js";
+import { deleteFromCloudinary } from "../../config/cloudinaryService.js";
 
-export const createVariant = async (payload) => {
-  const { productId, ...variantData } = payload;
+// ============================================================================
+// PREPARATION METHODS
+// ============================================================================
 
-  // Check if product exists
+export const prepareVariant = async (payload, context = {}) => {
+  return VariantFactory.buildForCreate(payload, context);
+};
+
+export const prepareVariants = async (variants = [], context = {}) => {
+  return VariantFactory.buildMany(variants, context);
+};
+
+export const updatePreparedVariant = async (
+  existingVariant,
+  payload,
+  context = {},
+) => {
+  return VariantFactory.buildForUpdate(existingVariant, payload, context);
+};
+
+// ============================================================================
+// PERSISTENCE METHODS
+// ============================================================================
+
+export const createVariant = async (payload, tx = null) => {
+  const { productId, variantImages = [], ...variantData } = payload;
+
   const product = await productDb.findProductById(productId);
   if (!product) {
     throw new NotFoundError("Product not found");
   }
 
-  // Generate SKU if not provided
-  if (!variantData.sku) {
-    variantData.sku = await SKUGenerator.generateSKU({
-      productName: product.name,
-      categoryId: product.categoryId,
-      color: variantData.color,
-      size: variantData.size,
-    });
-  } else {
-    // Check SKU uniqueness
+  if (variantData.sku) {
     const existing = await variantDb.findVariantBySKU(variantData.sku);
     if (existing) {
       throw new ConflictError("SKU already exists");
     }
   }
 
-  // Validate CBM dimensions
-  if (variantData.length && variantData.width && variantData.height) {
-    const cbm = CBMCalculator.calculateCBM({
-      length: variantData.length,
-      width: variantData.width,
-      height: variantData.height,
-    });
-    variantData.cbm = cbm;
-  }
-
-  // Calculate volumetric weight
-  if (variantData.cbm && variantData.actualWeight) {
-    variantData.volumetricWeight = CBMCalculator.calculateVolumetricWeight(
-      variantData.cbm,
-      variantData.shippingType || "SEA",
-    );
-    variantData.chargeableWeight = CBMCalculator.calculateChargeableWeight(
-      variantData.actualWeight,
-      variantData.cbm,
-      variantData.shippingType || "SEA",
-    );
-  }
-
-  return variantDb.createVariant({
-    ...variantData,
-    productId,
+  const preparedVariant = await VariantFactory.buildForCreate(variantData, {
+    productName: product.name,
+    categoryId: product.categoryId,
   });
+
+  // Create variant with images
+  return variantDb.createVariantWithMedia(
+    {
+      ...preparedVariant,
+      productId,
+    },
+    variantImages,
+    tx,
+  );
 };
 
-export const updateVariant = async (id, payload) => {
+export const updateVariant = async (id, payload, tx = null) => {
   const variant = await variantDb.findVariantById(id);
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
 
-  // Recalculate CBM if dimensions changed
-  if (payload.length || payload.width || payload.height) {
-    const length = payload.length || variant.length;
-    const width = payload.width || variant.width;
-    const height = payload.height || variant.height;
+  const { variantImages, ...updateData } = payload;
 
-    if (length && width && height) {
-      const cbm = CBMCalculator.calculateCBM({ length, width, height });
-      payload.cbm = cbm;
-
-      // Recalculate volumetric weight
-      const actualWeight = payload.actualWeight || variant.actualWeight;
-      const shippingType =
-        payload.shippingType || variant.shippingType || "SEA";
-
-      if (actualWeight) {
-        payload.volumetricWeight = CBMCalculator.calculateVolumetricWeight(
-          cbm,
-          shippingType,
-        );
-        payload.chargeableWeight = CBMCalculator.calculateChargeableWeight(
-          actualWeight,
-          cbm,
-          shippingType,
-        );
-      }
+  if (updateData.sku && updateData.sku !== variant.sku) {
+    const existing = await variantDb.findVariantBySKU(updateData.sku);
+    if (existing && existing.id !== id) {
+      throw new ConflictError("SKU already exists");
     }
   }
 
-  return variantDb.updateVariant(id, payload);
+  const preparedVariant = await VariantFactory.buildForUpdate(
+    variant,
+    updateData,
+    {
+      productName: variant.product.name,
+      categoryId: variant.product.categoryId,
+    },
+  );
+
+  return variantDb.updateVariant(id, preparedVariant, tx);
 };
 
-export const getVariantById = async (id) => {
+export const updateVariantImages = async (id, images, tx = null) => {
   const variant = await variantDb.findVariantById(id);
+  if (!variant) {
+    throw new NotFoundError("Variant not found");
+  }
+
+  // Get old images to delete from Cloudinary
+  const oldImages = variant.media || [];
+  const oldPublicIds = oldImages.map((img) => img.publicId);
+
+  // Update variant media
+  const updatedVariant = await variantDb.updateVariantMedia(id, images, tx);
+
+  // Delete old images from Cloudinary
+  if (oldPublicIds.length > 0) {
+    await deleteFromCloudinary(oldPublicIds);
+  }
+
+  return updatedVariant;
+};
+
+export const deleteVariant = async (id, tx = null) => {
+  const variant = await variantDb.findVariantById(id);
+  if (!variant) {
+    throw new NotFoundError("Variant not found");
+  }
+
+  // Get image publicIds before deletion
+  const images = variant.media || [];
+  const publicIds = images.map((img) => img.publicId);
+
+  // Delete variant from database
+  const deletedVariant = await variantDb.deleteVariant(id, tx);
+
+  // Delete images from Cloudinary
+  if (publicIds.length > 0) {
+    await deleteFromCloudinary(publicIds);
+  }
+
+  return deletedVariant;
+};
+
+export const bulkCreateVariants = async (
+  productId,
+  variantsData,
+  tx = null,
+) => {
+  const product = await productDb.findProductById(productId);
+  if (!product) {
+    throw new NotFoundError("Product not found");
+  }
+
+  const preparedVariants = await VariantFactory.buildMany(variantsData, {
+    productName: product.name,
+    categoryId: product.categoryId,
+  });
+
+  return variantDb.bulkCreateVariants(
+    preparedVariants.map((variant, index) => ({
+      ...variant,
+      productId,
+      // If variantImages are provided in the data
+      variantImages: variantsData[index]?.variantImages || [],
+    })),
+    tx,
+  );
+};
+
+// ============================================================================
+// READ METHODS (delegated to DB)
+// ============================================================================
+
+export const getVariantById = async (id, tx = null) => {
+  const variant = await variantDb.findVariantById(id, tx);
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
   return variant;
 };
 
-export const getVariantsByProduct = async (productId, filters = {}) => {
-  return variantDb.findVariantsByProduct(productId, filters);
-};
-
-export const deleteVariant = async (id) => {
-  const variant = await variantDb.findVariantById(id);
-  if (!variant) {
-    throw new NotFoundError("Variant not found");
-  }
-  return variantDb.deleteVariant(id);
-};
-
-export const bulkCreateVariants = async (productId, variantsData) => {
-  const product = await productDb.findProductById(productId);
-  if (!product) {
-    throw new NotFoundError("Product not found");
-  }
-
-  const variants = [];
-  for (const data of variantsData) {
-    // Generate SKU if not provided
-    if (!data.sku) {
-      data.sku = await SKUGenerator.generateSKU({
-        productName: product.name,
-        categoryId: product.categoryId,
-        color: data.color,
-        size: data.size,
-      });
-    }
-
-    // Calculate CBM
-    if (data.length && data.width && data.height) {
-      data.cbm = CBMCalculator.calculateCBM({
-        length: data.length,
-        width: data.width,
-        height: data.height,
-      });
-    }
-
-    variants.push({
-      ...data,
-      productId,
-    });
-  }
-
-  return variantDb.bulkCreateVariants(variants);
+export const getVariantsByProduct = (productId, filters = {}, tx = null) => {
+  return variantDb.findVariantsByProduct(productId, filters, tx);
 };

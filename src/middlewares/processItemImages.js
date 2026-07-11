@@ -1,15 +1,22 @@
+// middlewares/processMedia.js
 import { uploadBufferToCloudinary } from "../config/cloudinaryService.js";
 
-// Process multiple item images (Handles req.files from multer .array())
-export const processItemImages = async (req, res, next) => {
+/**
+ * Process variant images from multer upload
+ * Expects req.files from upload.array('images')
+ * Attaches processed images to req.body.variantImages
+ */
+export const processVariantImages = async (req, res, next) => {
   try {
-    // If no files were uploaded via multer, just proceed
-    if (!req.files || req.files.length === 0) return next();
+    if (!req.files || req.files.length === 0) {
+      req.body.variantImages = [];
+      return next();
+    }
 
-    // Loop through all uploaded file buffers and send them to Cloudinary
     const uploadPromises = req.files.map(async (file) => {
       const result = await uploadBufferToCloudinary(file.buffer, {
-        folder: "keplex-items", // Organized folder for store items
+        folder: "keplex/variants",
+        resource_type: "image",
       });
 
       return {
@@ -17,17 +24,14 @@ export const processItemImages = async (req, res, next) => {
         publicId: result.publicId,
         mimeType: file.mimetype,
         bytes: result.bytes,
-        format: result.format, // optional extras
+        format: result.format,
         width: result.width,
         height: result.height,
       };
     });
 
-    // Wait for all uploads to complete successfully
     const uploadedImages = await Promise.all(uploadPromises);
-
-    // CRITICAL: Attach to req.body.images so validation & service find it!
-    req.body.images = uploadedImages;
+    req.body.variantImages = uploadedImages;
 
     next();
   } catch (err) {
@@ -35,84 +39,98 @@ export const processItemImages = async (req, res, next) => {
   }
 };
 
-export const processSingleTrainingImage = async (req, res, next) => {
+/**
+ * Process product hero image
+ * Expects req.file from upload.single('heroImage')
+ */
+export const processHeroImage = async (req, res, next) => {
   try {
-    console.log("processSingleTrainingImage called");
-    console.log(
-      "req.file:",
-      req.file?.originalname,
-      req.file?.mimetype,
-      req.file?.size,
-    );
-
     if (!req.file) {
-      console.log("No file found, skipping upload");
+      req.body.heroImage = null;
       return next();
     }
 
     const result = await uploadBufferToCloudinary(req.file.buffer, {
-      folder: "keplex-trainings",
+      folder: "keplex/products/hero",
+      resource_type: "image",
     });
 
-    console.log("Cloudinary result:", result);
-
-    req.uploadedFile = {
+    req.body.heroImage = {
       url: result.url,
       publicId: result.publicId,
       mimeType: req.file.mimetype,
       bytes: result.bytes,
+      format: result.format,
+      width: result.width,
+      height: result.height,
     };
 
     next();
   } catch (err) {
-    console.error("processSingleTrainingImage error:", err.message);
     next(err);
   }
 };
 
-export const processMultipleUploads =
-  ({ folder, bodyField = "images" }) =>
-  async (req, res, next) => {
+/**
+ * Generic image processor for any field
+ * Usage: processImages('variantImages', 'keplex/variants')
+ */
+export const processImages = (
+  bodyField = "images",
+  folder = "keplex/general",
+) => {
+  return async (req, res, next) => {
     try {
-      if (!req.files?.length) return next();
+      if (!req.files || req.files.length === 0) {
+        req.body[bodyField] = [];
+        return next();
+      }
 
-      const uploads = await Promise.all(
-        req.files.map(async (file) => {
-          const result = await uploadBufferToCloudinary(file.buffer, {
-            folder,
-          });
+      const uploadPromises = req.files.map(async (file) => {
+        const result = await uploadBufferToCloudinary(file.buffer, {
+          folder,
+          resource_type: "image",
+        });
 
-          return {
-            url: result.url,
-            publicId: result.publicId,
-            mimeType: file.mimetype,
-            bytes: result.bytes,
-            format: result.format,
-            width: result.width,
-            height: result.height,
-          };
-        }),
-      );
+        return {
+          url: result.url,
+          publicId: result.publicId,
+          mimeType: file.mimetype,
+          bytes: result.bytes,
+          format: result.format,
+          width: result.width,
+          height: result.height,
+        };
+      });
 
-      req.body[bodyField] = uploads;
+      const uploadedImages = await Promise.all(uploadPromises);
+      req.body[bodyField] = uploadedImages;
 
       next();
     } catch (err) {
       next(err);
     }
   };
+};
 
-export const processSingleUpload =
-  ({ folder, requestField = "uploadedFile" }) =>
-  async (req, res, next) => {
+/**
+ * Process single image upload to a specific folder
+ * Usage: processSingleImage('keplex/products')
+ */
+export const processSingleImage = (folder = "keplex/general") => {
+  return async (req, res, next) => {
     try {
-      if (!req.file) return next();
+      if (!req.file) {
+        req.uploadedImage = null;
+        return next();
+      }
 
       const result = await uploadBufferToCloudinary(req.file.buffer, {
         folder,
+        resource_type: "image",
       });
 
-      req[requestField] = {
+      req.uploadedImage = {
         url: result.url,
         publicId: result.publicId,
         mimeType: req.file.mimetype,
@@ -127,3 +145,4 @@ export const processSingleUpload =
       next(err);
     }
   };
+};

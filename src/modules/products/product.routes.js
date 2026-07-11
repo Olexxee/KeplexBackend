@@ -6,6 +6,8 @@ import {
   validateParams,
   validateQuery,
 } from "../../middlewares/validateMiddleware.js";
+import { uploadVariantImages } from "../../middlewares/uploadMiddleware.js";
+import { processVariantImages } from "../../middlewares/processMedia.js";
 import * as productController from "./product.controller.js";
 import {
   createProductSchema,
@@ -16,11 +18,12 @@ import {
   updateProductStatusSchema,
 } from "./product.validation.js";
 
-
-
 const productRouter = Router();
 
-// Public routes (no auth required)
+// ============================================================================
+// PUBLIC ROUTES (READ)
+// ============================================================================
+
 productRouter.get(
   "/",
   validateQuery(getProductsQuerySchema),
@@ -70,11 +73,17 @@ productRouter.get(
   productController.getProductById,
 );
 
-// Admin routes (auth required)
+// ============================================================================
+// ADMIN ROUTES (WRITE)
+// ============================================================================
+
+// Create product with variant images
 productRouter.post(
   "/",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  uploadVariantImages, // Uploads variant images to req.files
+  processVariantImages, // Processes images, attaches to req.body.variantImages
   validateBody(createProductSchema),
   productController.createProduct,
 );
