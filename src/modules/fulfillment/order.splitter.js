@@ -192,7 +192,7 @@ export class OrderSplitter {
       if (type === "LOCAL") {
         cost = totalWeight * (shippingConfig?.pricePerKg || 0);
       } else if (type === "IMPORT") {
-        cost = totalWeight * (shippingConfig?.pricePerKg || 0) * 1.5; // Import premium
+        cost = totalWeight * (shippingConfig?.pricePerKg || 0) * 1.5; 
       } else if (type === "PREORDER") {
         cost = 0; // Preorders might have free shipping
       } else if (type === "DIGITAL") {

@@ -41,6 +41,10 @@ export const getTestimonialStats = async () => {
   return testimonialDb.getTestimonialStats();
 };
 
+export const getApprovedTestimonials = async ({ limit = 6 } = {}) => {
+  return testimonialDb.findApprovedTestimonials(limit);
+};
+
 export const updateTestimonialStatus = async ({ id, status }) => {
   const normalizedStatus = normalizeStatus(status);
 

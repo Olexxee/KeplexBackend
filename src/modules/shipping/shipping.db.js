@@ -1,4 +1,3 @@
-// modules/shipping/shipping.db.js
 import { prisma } from "../../config/prisma.js";
 
 export const createShippingConfig = (data) => {

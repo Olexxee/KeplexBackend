@@ -18,6 +18,18 @@ export const findTestimonialById = async (id, tx = null) => {
   });
 };
 
+export const findApprovedTestimonials = async (limit = 6) => {
+  return prisma.testimonial.findMany({
+    where: {
+      status: "APPROVED",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: limit,
+  });
+};
+
 export const updateTestimonialById = async (id, data, tx = null) => {
   const db = dbClient(tx);
 

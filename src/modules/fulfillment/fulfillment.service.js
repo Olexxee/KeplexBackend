@@ -1,12 +1,18 @@
+// modules/fulfillment/fulfillment.service.js
 import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
 import {
   getPaginationParams,
   formatPaginatedResponse,
 } from "../../lib/pagination.js";
+import { ShippingCalculator } from "../shipping/shipping.calculator.js";
 import * as fulfillmentDb from "./fulfillment.db.js";
 import { OrderSplitter } from "./order.splitter.js";
 import * as orderDb from "../orders/order.db.js";
 import { prisma } from "../../config/prisma.js";
+
+// ============================================================================
+// FULFILLMENT CRUD
+// ============================================================================
 
 export const getFulfillments = async (filters) => {
   const { page, limit, orderId, type, status, warehouseId } = filters;
@@ -120,6 +126,10 @@ export const deleteFulfillment = async (id) => {
   return fulfillmentDb.deleteFulfillment(id);
 };
 
+// ============================================================================
+// FULFILLMENT GENERATION
+// ============================================================================
+
 export const createFulfillmentsForOrder = async (orderId) => {
   const order = await orderDb.findOrderById(orderId);
   if (!order) {
@@ -130,23 +140,35 @@ export const createFulfillmentsForOrder = async (orderId) => {
   const splitter = new OrderSplitter();
   const groups = splitter.splitOrderByFulfillment(order.items);
 
-  // Create fulfillments
+  // Calculate fulfillment metrics using ShippingCalculator
+  const fulfillmentMetrics = ShippingCalculator.calculateFulfillment(groups);
+
+  // Create fulfillments with metrics
   const fulfillments = [];
   for (const [type, items] of Object.entries(groups)) {
     if (items.length === 0) continue;
 
     const warehouseId = await splitter.assignWarehouse(type, items);
+    const metrics = fulfillmentMetrics[type];
+
     const fulfillment = await fulfillmentDb.createFulfillment({
       orderId,
       type,
       warehouseId,
       status: "PENDING",
+      shippingCost: 0, // Will be calculated by shipping service
       items: {
         create: items.map((item) => ({
           variantId: item.variantId,
           quantity: item.quantity,
           unitPrice: Number(item.unitPriceSnapshot),
         })),
+      },
+      // Store calculated metrics for reference
+      metadata: {
+        totalCBM: metrics?.totalCBM || 0,
+        totalWeight: metrics?.totalChargeableWeight || 0,
+        subtotal: metrics?.subtotal || 0,
       },
     });
 
@@ -155,6 +177,10 @@ export const createFulfillmentsForOrder = async (orderId) => {
 
   return fulfillments;
 };
+
+// ============================================================================
+// WAREHOUSE CRUD
+// ============================================================================
 
 export const getWarehouses = async (filters) => {
   const { page, limit, isActive, search } = filters;
@@ -180,10 +206,10 @@ export const getWarehouseById = async (id) => {
 
 export const createWarehouse = async (payload) => {
   // Check for duplicate code
-  const existing = await fulfillmentDb.findWarehouses({
+  const [existing] = await fulfillmentDb.findWarehouses({
     search: payload.code,
   });
-  if (existing.length > 0) {
+  if (existing && existing.length > 0) {
     throw new BadRequestError("Warehouse with this code already exists");
   }
 
@@ -214,6 +240,10 @@ export const deleteWarehouse = async (id) => {
 
   return fulfillmentDb.deleteWarehouse(id);
 };
+
+// ============================================================================
+// PRIVATE HELPERS
+// ============================================================================
 
 /**
  * Check and update order status based on fulfillments
