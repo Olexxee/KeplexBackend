@@ -1,0 +1,836 @@
+{
+  "info": {
+    "name": "Keplex - Products & Variants API",
+    "description": "Complete API collection for Products and Variants with image upload support",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "cookie",
+    "cookie": [
+      {
+        "key": "accessToken",
+        "value": "{{accessToken}}",
+        "domain": "{{baseUrl}}",
+        "path": "/"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "variantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "brandId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "collectionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 1. Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@keplex.com\",\n    \"password\": \"AdminPass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📂 2. Categories (Setup)",
+      "item": [
+        {
+          "name": "Create Category",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Footwear\",\n    \"slug\": \"footwear\",\n    \"description\": \"All types of footwear\",\n    \"type\": \"PRODUCT\",\n    \"isActive\": true,\n    \"sortOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "categories"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "categories"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏷️ 3. Brands (Setup)",
+      "item": [
+        {
+          "name": "Create Brand",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Nike\",\n    \"slug\": \"nike\",\n    \"logo\": \"https://example.com/nike-logo.png\",\n    \"description\": \"Leading sportswear brand\",\n    \"isActive\": true,\n    \"sortOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/brands",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "brands"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/brands",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "brands"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📦 4. Products - Public (Read)",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Featured Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/featured?limit=6",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "featured"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "6"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get New Arrivals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/new-arrivals?limit=6",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "new-arrivals"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "6"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Best Sellers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/best-sellers?limit=6",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "best-sellers"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "6"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{productId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/slug/nike-air-max-2024",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "slug", "nike-air-max-2024"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product Variants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{productId}}", "variants"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Related Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productId}}/related?limit=4",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{productId}}", "related"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "4"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "✍️ 5. Products - Admin (Write)",
+      "item": [
+        {
+          "name": "Create Product (JSON)",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Nike Air Max 2024\",\n    \"slug\": \"nike-air-max-2024\",\n    \"description\": \"The latest Nike Air Max with superior comfort and style.\",\n    \"categoryId\": \"{{categoryId}}\",\n    \"brandId\": \"{{brandId}}\",\n    \"collectionId\": \"{{collectionId}}\",\n    \"isFeatured\": true,\n    \"isNew\": true,\n    \"isBestSeller\": false,\n    \"status\": \"ACTIVE\",\n    \"variants\": [\n        {\n            \"sku\": \"NIKE-AM-BLK-42\",\n            \"color\": \"Black\",\n            \"size\": \"42\",\n            \"price\": 25000,\n            \"compareAtPrice\": 30000,\n            \"stock\": 50,\n            \"weight\": 0.5,\n            \"actualWeight\": 0.5,\n            \"fulfillmentType\": \"LOCAL\",\n            \"shippingType\": \"LOCAL\",\n            \"length\": 30,\n            \"width\": 20,\n            \"height\": 10,\n            \"isActive\": true\n        },\n        {\n            \"sku\": \"NIKE-AM-BLK-43\",\n            \"color\": \"Black\",\n            \"size\": \"43\",\n            \"price\": 25000,\n            \"compareAtPrice\": 30000,\n            \"stock\": 30,\n            \"weight\": 0.5,\n            \"actualWeight\": 0.5,\n            \"fulfillmentType\": \"LOCAL\",\n            \"shippingType\": \"LOCAL\",\n            \"length\": 30,\n            \"width\": 20,\n            \"height\": 10,\n            \"isActive\": true\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product with Images (multipart/form-data)",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Nike Air Max 2024",
+                  "type": "text"
+                },
+                {
+                  "key": "slug",
+                  "value": "nike-air-max-2024-with-images",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "The latest Nike Air Max with superior comfort and style.",
+                  "type": "text"
+                },
+                {
+                  "key": "categoryId",
+                  "value": "{{categoryId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "brandId",
+                  "value": "{{brandId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "isFeatured",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "isNew",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "type": "text"
+                },
+                {
+                  "key": "variants",
+                  "value": "[{\"color\":\"Black\",\"size\":\"42\",\"price\":25000,\"stock\":50,\"weight\":0.5,\"actualWeight\":0.5,\"fulfillmentType\":\"LOCAL\",\"shippingType\":\"LOCAL\",\"length\":30,\"width\":20,\"height\":10},{\"color\":\"White\",\"size\":\"42\",\"price\":26000,\"stock\":40,\"weight\":0.5,\"actualWeight\":0.5,\"fulfillmentType\":\"LOCAL\",\"shippingType\":\"LOCAL\",\"length\":30,\"width\":20,\"height\":10}]",
+                  "type": "text"
+                },
+                {
+                  "key": "images",
+                  "value": "",
+                  "type": "file",
+                  "src": "/path/to/shoe-image-1.jpg"
+                },
+                {
+                  "key": "images",
+                  "value": "",
+                  "type": "file",
+                  "src": "/path/to/shoe-image-2.jpg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Nike Air Max 2024 - Updated\",\n    \"isFeatured\": false,\n    \"description\": \"Updated description for the product\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", "{{productId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product Status",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"ARCHIVED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{productId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", "{{productId}}", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", "{{productId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎨 6. Variants - Admin",
+      "item": [
+        {
+          "name": "Create Variant (JSON)",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": \"{{productId}}\",\n    \"sku\": \"NIKE-AM-RED-44\",\n    \"color\": \"Red\",\n    \"size\": \"44\",\n    \"price\": 27000,\n    \"compareAtPrice\": 32000,\n    \"stock\": 20,\n    \"weight\": 0.5,\n    \"actualWeight\": 0.5,\n    \"fulfillmentType\": \"LOCAL\",\n    \"shippingType\": \"LOCAL\",\n    \"length\": 30,\n    \"width\": 20,\n    \"height\": 10,\n    \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Variant with Images (multipart/form-data)",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "productId",
+                  "value": "{{productId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "sku",
+                  "value": "NIKE-AM-BLUE-42",
+                  "type": "text"
+                },
+                {
+                  "key": "color",
+                  "value": "Blue",
+                  "type": "text"
+                },
+                {
+                  "key": "size",
+                  "value": "42",
+                  "type": "text"
+                },
+                {
+                  "key": "price",
+                  "value": "25000",
+                  "type": "text"
+                },
+                {
+                  "key": "stock",
+                  "value": "30",
+                  "type": "text"
+                },
+                {
+                  "key": "weight",
+                  "value": "0.5",
+                  "type": "text"
+                },
+                {
+                  "key": "actualWeight",
+                  "value": "0.5",
+                  "type": "text"
+                },
+                {
+                  "key": "fulfillmentType",
+                  "value": "LOCAL",
+                  "type": "text"
+                },
+                {
+                  "key": "shippingType",
+                  "value": "LOCAL",
+                  "type": "text"
+                },
+                {
+                  "key": "length",
+                  "value": "30",
+                  "type": "text"
+                },
+                {
+                  "key": "width",
+                  "value": "20",
+                  "type": "text"
+                },
+                {
+                  "key": "height",
+                  "value": "10",
+                  "type": "text"
+                },
+                {
+                  "key": "images",
+                  "value": "",
+                  "type": "file",
+                  "src": "/path/to/variant-image-1.jpg"
+                },
+                {
+                  "key": "images",
+                  "value": "",
+                  "type": "file",
+                  "src": "/path/to/variant-image-2.jpg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Variant by ID",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/{{variantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants", "{{variantId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Variants by Product",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/product/{{productId}}?isActive=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants", "product", "{{productId}}"],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Variant",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"price\": 28000,\n    \"stock\": 25,\n    \"color\": \"Dark Red\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/{{variantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants", "{{variantId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Variant Images",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "value": "",
+                  "type": "file",
+                  "src": "/path/to/new-image-1.jpg"
+                },
+                {
+                  "key": "images",
+                  "value": "",
+                  "type": "file",
+                  "src": "/path/to/new-image-2.jpg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/{{variantId}}/images",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants", "{{variantId}}", "images"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Create Variants",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"variants\": [\n        {\n            \"sku\": \"NIKE-AM-GREEN-42\",\n            \"color\": \"Green\",\n            \"size\": \"42\",\n            \"price\": 25000,\n            \"stock\": 15,\n            \"weight\": 0.5,\n            \"actualWeight\": 0.5,\n            \"fulfillmentType\": \"LOCAL\",\n            \"shippingType\": \"LOCAL\",\n            \"length\": 30,\n            \"width\": 20,\n            \"height\": 10,\n            \"isActive\": true\n        },\n        {\n            \"sku\": \"NIKE-AM-GREEN-43\",\n            \"color\": \"Green\",\n            \"size\": \"43\",\n            \"price\": 25000,\n            \"stock\": 10,\n            \"weight\": 0.5,\n            \"actualWeight\": 0.5,\n            \"fulfillmentType\": \"LOCAL\",\n            \"shippingType\": \"LOCAL\",\n            \"length\": 30,\n            \"width\": 20,\n            \"height\": 10,\n            \"isActive\": true\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/product/{{productId}}/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants", "product", "{{productId}}", "bulk"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Variant",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/variants/{{variantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "variants", "{{variantId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔄 7. Variants - Public",
+      "item": [
+        {
+          "name": "Get Product Variants (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/variants/product/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "variants", "product", "{{productId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Variant by ID (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/variants/{{variantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "variants", "{{variantId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧹 8. Cleanup",
+      "item": [
+        {
+          "name": "Delete All Test Products",
+          "request": {
+            "auth": {
+              "type": "cookie"
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "products", "{{productId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

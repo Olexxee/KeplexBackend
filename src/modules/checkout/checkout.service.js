@@ -1,11 +1,10 @@
-// modules/checkout/checkout.service.js
 import { prisma } from "../../config/prisma.js";
 import { BadRequestError } from "../../classes/errorClasses.js";
 import { ShippingCalculator } from "../shipping/shipping.calculator.js";
 import * as shippingService from "../shipping/shipping.service.js";
-import * as orderDb from "../orders/order.db.js";
+import * as orderDb from "../order/order.db.js";
 import * as cartDb from "../cart/cart.db.js";
-import * as addressDb from "../addresses/address.db.js";
+import * as addressDb from "../address/address.db.js";
 import { OrderSplitter } from "../fulfillment/order.splitter.js";
 
 const toNumber = (v) => Number(v);

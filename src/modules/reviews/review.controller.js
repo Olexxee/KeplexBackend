@@ -5,7 +5,16 @@ import * as reviewService from "./review.service.js";
 // ============ Customer Endpoints ============
 
 export const createReview = asyncWrapper(async (req, res) => {
-  const review = await reviewService.createReview(req.user.id, req.body);
+  // If images were uploaded via middleware, they'll be in req.body.images
+  // or req.body.variantImages depending on which middleware was used
+  const reviewData = {
+    ...req.body,
+    // If using processImages middleware, images are already processed
+    // If using processSingleImage, it's in req.uploadedImage
+    // Adjust based on your route configuration
+  };
+
+  const review = await reviewService.createReview(req.user.id, reviewData);
 
   return successResponse({
     res,
@@ -37,10 +46,13 @@ export const getReviewById = asyncWrapper(async (req, res) => {
 });
 
 export const updateReview = asyncWrapper(async (req, res) => {
+  // If images are being updated, they'll be in req.body
+  const updateData = req.body;
+
   const review = await reviewService.updateReview(
     req.params.id,
     req.user.id,
-    req.body,
+    updateData,
   );
 
   return successResponse({

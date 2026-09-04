@@ -1,4 +1,3 @@
-// modules/cart/cart.service.js
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
 import * as cartDb from "./cart.db.js";
 import * as variantDb from "../variants/variant.db.js";

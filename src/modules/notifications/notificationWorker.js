@@ -1,33 +1,34 @@
-import { Worker } from "bullmq";
-import { redisConnection } from "../../config/redis.js";
-import { QUEUE_NAMES } from "./notification.queue.js";
-import { notificationHandlers } from "./notification.handlers.js";
+import { app } from "./app.js";
+import { env } from "./config/env.js";
+import { prisma } from "./config/prisma.js";
 
-export const notificationWorker = new Worker(
-  QUEUE_NAMES.NOTIFICATION,
-  async (job) => {
-    const handler = notificationHandlers[job.name];
+// Redis/notification worker temporarily disabled
+// import "./modules/notifications/notificationWorker.js";
 
-    if (!handler) {
-      throw new Error(`No handler found for job: ${job.name}`);
-    }
+const startServer = async () => {
+  try {
+    // 1. Establish database connection first
+    await prisma.$connect();
+    console.log("Database connected");
 
-    return handler(job.data);
-  },
-  {
-    connection: redisConnection,
-    concurrency: 10,
-  },
-);
+    app.listen(env.port, () => {
+      console.log(`Server running on port ${env.port}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
 
-notificationWorker.on("completed", (job) => {
-  console.log(`Notification job completed: ${job.name}`);
+// Fire startup lifecycle
+startServer();
+
+process.on("SIGINT", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
 });
 
-notificationWorker.on("failed", (job, err) => {
-  console.error(`Notification job failed: ${job?.name}`, err);
-});
-
-notificationWorker.on("error", (err) => {
-  console.error("Worker crashed:", err);
+process.on("SIGTERM", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
 });

@@ -146,3 +146,6 @@ export const processSingleImage = (folder = "keplex/general") => {
     }
   };
 };
+
+import { BadRequestError } from "../classes/errorClasses.js";
+

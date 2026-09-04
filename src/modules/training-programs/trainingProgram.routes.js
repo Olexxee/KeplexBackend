@@ -4,11 +4,8 @@ import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 import { validateBody } from "../../middlewares/validateMiddleware.js";
 import { createTrainingSchema } from "./trainingProgram.validation.js";
-import { uploadTrainingImage } from "../../middlewares/uploadMiddleware.js";
-import {
-  processItemImages,
-  processSingleTrainingImage,
-} from "../../middlewares/processItemImages.js";
+import { uploadSingleImage } from "../../middlewares/uploadMiddleware.js";
+import { processSingleImage } from "../../middlewares/processItemImages.js";
 
 const trainingRouter = express.Router();
 
@@ -66,8 +63,8 @@ trainingRouter.post(
   "/:id/media",
   authMiddleware,
   roleMiddleware("ADMIN", "SUPER_ADMIN"),
-  uploadTrainingImage,
-  processSingleTrainingImage, // 👈 Swapped out processItemImages here
+  uploadSingleImage, // Single image upload middleware
+  processSingleImage("keplex/training"), // Process and upload to Cloudinary
   controller.uploadProgramMedia,
 );
 

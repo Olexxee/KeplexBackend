@@ -1,10 +1,10 @@
-// modules/brands/brand.controller.js
+import { BadRequestError } from "../../classes/errorClasses.js";
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
 import * as brandService from "./brand.service.js";
 
 export const createBrand = asyncWrapper(async (req, res) => {
-  const brand = await brandService.createBrand(req.body);
+  const brand = await brandService.createBrand(req.body, req.uploadedImage);
 
   return successResponse({
     res,
@@ -46,11 +46,32 @@ export const getBrandBySlug = asyncWrapper(async (req, res) => {
 });
 
 export const updateBrand = asyncWrapper(async (req, res) => {
-  const brand = await brandService.updateBrand(req.params.id, req.body);
+  const brand = await brandService.updateBrand(
+    req.params.id,
+    req.body,
+    req.uploadedImage,
+  );
 
   return successResponse({
     res,
     message: "Brand updated successfully",
+    data: brand,
+  });
+});
+
+export const updateBrandLogo = asyncWrapper(async (req, res) => {
+  if (!req.uploadedImage) {
+    throw new BadRequestError("No logo image uploaded");
+  }
+
+  const brand = await brandService.updateBrandLogo(
+    req.params.id,
+    req.uploadedImage,
+  );
+
+  return successResponse({
+    res,
+    message: "Brand logo updated successfully",
     data: brand,
   });
 });

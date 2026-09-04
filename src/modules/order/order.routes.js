@@ -20,27 +20,28 @@ import {
 
 const orderRouter = Router();
 
+// Apply auth middleware to all routes
 orderRouter.use(authMiddleware);
 
-// Checkout
+// ─── CHECKOUT ────────────────────────────────────────────────
 orderRouter.post(
   "/checkout",
   validateBody(checkoutSchema),
   orderController.checkout,
 );
 
-// Customer routes
+// ─── CUSTOMER ROUTES ────────────────────────────────────────
 orderRouter.get(
   "/me",
   validateQuery(getMyOrdersQuerySchema),
   orderController.getMyOrders,
 );
 
-orderRouter.get(
-  "/me/timeline/:id",
-  validateParams(orderIdSchema),
-  orderController.getOrderTimeline,
-);
+// orderRouter.get(
+//   "/me/timeline/:id",
+//   validateParams(orderIdSchema),
+//   orderController.getOrderTimeline,
+// );
 
 orderRouter.get(
   "/by-number/:orderNumber",
@@ -48,7 +49,8 @@ orderRouter.get(
   orderController.getOrderByOrderNumber,
 );
 
-// Admin routes
+// ─── ADMIN ROUTES ───────────────────────────────────────────
+// IMPORTANT: Specific routes MUST come before generic /:id routes
 orderRouter.get(
   "/",
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
@@ -68,6 +70,7 @@ orderRouter.get(
   orderController.getOrdersByFulfillmentType,
 );
 
+// ─── GENERIC ORDER ROUTES (must be last) ──────────────────
 orderRouter.get(
   "/:id",
   validateParams(orderIdSchema),

@@ -9,6 +9,20 @@ const ALLOWED_KEYS = [
   "training_faq",
 ];
 
+const DEFAULT_STORE_SETTINGS = {
+  companyName: "Keplex",
+  logo: null,
+  phone: null,
+  email: null,
+  socialLinks: {},
+  address: null,
+
+  heroSlides: [],
+
+  showImportedCategory: false,
+  featuredCategories: [],
+};
+
 export const getAllConfigs = async () => {
   const configs = await businessConfigDb.findAllConfigs();
 
@@ -19,16 +33,22 @@ export const getAllConfigs = async () => {
       showOnLandingPage: false,
       showInStore: false,
     },
+
     pricing_rules: configs.find((c) => c.key === "pricing_rules")?.value ?? {
       globalDiscount: 0,
-      trainingPromo: { active: false, percent: 0 },
+      trainingPromo: {
+        active: false,
+        percent: 0,
+      },
     },
-    store_settings: configs.find((c) => c.key === "store_settings")?.value ?? {
-      showImportedCategory: false,
-      featuredCategories: [],
-    },
+
+    store_settings:
+      configs.find((c) => c.key === "store_settings")?.value ??
+      DEFAULT_STORE_SETTINGS,
+
     training_programs:
       configs.find((c) => c.key === "training_programs")?.value ?? [],
+
     training_faq: configs.find((c) => c.key === "training_faq")?.value ?? [],
   };
 };

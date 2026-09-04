@@ -1,4 +1,3 @@
-// modules/variants/variant.service.js
 import { ConflictError, NotFoundError } from "../../classes/errorClasses.js";
 import * as variantDb from "./variant.db.js";
 import * as productDb from "../products/product.db.js";
@@ -6,17 +5,32 @@ import { VariantFactory } from "./variant.factory.js";
 import { deleteFromCloudinary } from "../../config/cloudinaryService.js";
 
 // ============================================================================
-// PREPARATION METHODS
+// PREPARATION
 // ============================================================================
 
+/**
+ * Prepare a single variant for creation.
+ *
+ * No database write occurs here.
+ */
 export const prepareVariant = async (payload, context = {}) => {
   return VariantFactory.buildForCreate(payload, context);
 };
 
+/**
+ * Prepare multiple variants for creation.
+ *
+ * No database write occurs here.
+ */
 export const prepareVariants = async (variants = [], context = {}) => {
   return VariantFactory.buildMany(variants, context);
 };
 
+/**
+ * Prepare an existing variant for update.
+ *
+ * No database write occurs here.
+ */
 export const updatePreparedVariant = async (
   existingVariant,
   payload,
@@ -26,54 +40,96 @@ export const updatePreparedVariant = async (
 };
 
 // ============================================================================
-// PERSISTENCE METHODS
+// CREATE
 // ============================================================================
 
-export const createVariant = async (payload, tx = null) => {
-  const { productId, variantImages = [], ...variantData } = payload;
+/**
+ * Create a variant, optionally with media.
+ *
+ * `variantImages` is a transport-level field and is never
+ * persisted directly on ProductVariant.
+ */
+export const createVariant = async (data, tx = null) => {
+  const db = tx ?? undefined;
 
-  const product = await productDb.findProductById(productId);
+  const {
+    productId,
+    variantImages = [],
+    imageIndexes,
+    ...variantPayload
+  } = data;
+
+  const product = await productDb.findProductById(productId, db);
+
   if (!product) {
     throw new NotFoundError("Product not found");
   }
 
-  if (variantData.sku) {
-    const existing = await variantDb.findVariantBySKU(variantData.sku);
-    if (existing) {
-      throw new ConflictError("SKU already exists");
-    }
+  const existingSku = await variantDb.findVariantBySKU(variantPayload.sku, db);
+
+  if (existingSku) {
+    throw new ConflictError(
+      `Variant SKU already exists: ${variantPayload.sku}`,
+    );
   }
 
-  const preparedVariant = await VariantFactory.buildForCreate(variantData, {
+  const preparedVariant = await VariantFactory.buildForCreate(variantPayload, {
     productName: product.name,
     categoryId: product.categoryId,
   });
 
-  // Create variant with images
   return variantDb.createVariantWithMedia(
     {
       ...preparedVariant,
       productId,
     },
     variantImages,
-    tx,
+    db,
   );
 };
 
+// ============================================================================
+// UPDATE
+// ============================================================================
+
+/**
+ * Update an existing variant.
+ *
+ * Scalar fields are updated via VariantFactory.buildForUpdate(). Media is
+ * replaced separately via updateVariantImages() — and only when the caller
+ * actually supplied new images. An empty/absent `variantImages` means "no
+ * image change" here, not "clear the images"; otherwise editing an
+ * unrelated field (price, stock) on a variant with no new upload would
+ * wipe its existing photos. An explicit "remove all images" action should
+ * be its own payload flag, not an empty array.
+ */
 export const updateVariant = async (id, payload, tx = null) => {
-  const variant = await variantDb.findVariantById(id);
+  const variant = await variantDb.findVariantById(id, tx);
+
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
 
-  const { variantImages, ...updateData } = payload;
+  const { variantImages, imageIndexes, ...updateData } = payload;
+
+  // --------------------------------------------------------------------------
+  // Validate SKU uniqueness
+  // --------------------------------------------------------------------------
 
   if (updateData.sku && updateData.sku !== variant.sku) {
-    const existing = await variantDb.findVariantBySKU(updateData.sku);
-    if (existing && existing.id !== id) {
+    const existingVariant = await variantDb.findVariantBySKU(
+      updateData.sku,
+      tx,
+    );
+
+    if (existingVariant && existingVariant.id !== id) {
       throw new ConflictError("SKU already exists");
     }
   }
+
+  // --------------------------------------------------------------------------
+  // Prepare and persist scalar fields
+  // --------------------------------------------------------------------------
 
   const preparedVariant = await VariantFactory.buildForUpdate(
     variant,
@@ -84,23 +140,42 @@ export const updateVariant = async (id, payload, tx = null) => {
     },
   );
 
-  return variantDb.updateVariant(id, preparedVariant, tx);
+  const updatedVariant = await variantDb.updateVariant(id, preparedVariant, tx);
+
+  // --------------------------------------------------------------------------
+  // Replace media only when new images were actually provided
+  // --------------------------------------------------------------------------
+
+  if (Array.isArray(variantImages) && variantImages.length > 0) {
+    return updateVariantImages(id, variantImages, tx);
+  }
+
+  return updatedVariant;
 };
 
-export const updateVariantImages = async (id, images, tx = null) => {
-  const variant = await variantDb.findVariantById(id);
+// ============================================================================
+// MEDIA
+// ============================================================================
+
+/**
+ * Replace all images belonging to a variant.
+ *
+ * Database media records are replaced and the old Cloudinary
+ * assets are removed afterward.
+ */
+export const updateVariantImages = async (id, images = [], tx = null) => {
+  const variant = await variantDb.findVariantById(id, tx);
+
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
 
-  // Get old images to delete from Cloudinary
   const oldImages = variant.media || [];
-  const oldPublicIds = oldImages.map((img) => img.publicId);
 
-  // Update variant media
+  const oldPublicIds = oldImages.map((image) => image.publicId).filter(Boolean);
+
   const updatedVariant = await variantDb.updateVariantMedia(id, images, tx);
 
-  // Delete old images from Cloudinary
   if (oldPublicIds.length > 0) {
     await deleteFromCloudinary(oldPublicIds);
   }
@@ -108,20 +183,26 @@ export const updateVariantImages = async (id, images, tx = null) => {
   return updatedVariant;
 };
 
+// ============================================================================
+// DELETE
+// ============================================================================
+
+/**
+ * Delete a variant and its associated Cloudinary images.
+ */
 export const deleteVariant = async (id, tx = null) => {
-  const variant = await variantDb.findVariantById(id);
+  const variant = await variantDb.findVariantById(id, tx);
+
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
 
-  // Get image publicIds before deletion
   const images = variant.media || [];
-  const publicIds = images.map((img) => img.publicId);
 
-  // Delete variant from database
+  const publicIds = images.map((image) => image.publicId).filter(Boolean);
+
   const deletedVariant = await variantDb.deleteVariant(id, tx);
 
-  // Delete images from Cloudinary
   if (publicIds.length > 0) {
     await deleteFromCloudinary(publicIds);
   }
@@ -129,12 +210,22 @@ export const deleteVariant = async (id, tx = null) => {
   return deletedVariant;
 };
 
+// ============================================================================
+// BULK CREATE
+// ============================================================================
+
+/**
+ * Create multiple variants for an existing product.
+ */
 export const bulkCreateVariants = async (
   productId,
   variantsData,
   tx = null,
 ) => {
-  const product = await productDb.findProductById(productId);
+  const db = tx ?? undefined;
+
+  const product = await productDb.findProductById(productId, db);
+
   if (!product) {
     throw new NotFoundError("Product not found");
   }
@@ -144,29 +235,69 @@ export const bulkCreateVariants = async (
     categoryId: product.categoryId,
   });
 
-  return variantDb.bulkCreateVariants(
-    preparedVariants.map((variant, index) => ({
-      ...variant,
-      productId,
-      // If variantImages are provided in the data
-      variantImages: variantsData[index]?.variantImages || [],
-    })),
-    tx,
-  );
+  const variantsWithImages = preparedVariants.map((variant, index) => ({
+    ...variant,
+    productId,
+    variantImages: variantsData[index]?.variantImages || [],
+  }));
+
+  return variantDb.bulkCreateVariants(variantsWithImages, tx);
 };
 
 // ============================================================================
-// READ METHODS (delegated to DB)
+// READ
 // ============================================================================
 
 export const getVariantById = async (id, tx = null) => {
   const variant = await variantDb.findVariantById(id, tx);
+
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
+
   return variant;
 };
 
 export const getVariantsByProduct = (productId, filters = {}, tx = null) => {
   return variantDb.findVariantsByProduct(productId, filters, tx);
+};
+
+// ============================================================================
+// STOCK
+// ============================================================================
+
+export const updateVariantStock = (id, quantity, tx = null) => {
+  return variantDb.updateVariantStock(id, quantity, tx);
+};
+
+export const decrementVariantStock = (id, quantity, tx = null) => {
+  return variantDb.decrementVariantStock(id, quantity, tx);
+};
+
+export const incrementVariantStock = (id, quantity, tx = null) => {
+  return variantDb.incrementVariantStock(id, quantity, tx);
+};
+
+export const getVariantWithStockCheck = (id, requiredQuantity, tx = null) => {
+  return variantDb.getVariantWithStockCheck(id, requiredQuantity, tx);
+};
+
+// ============================================================================
+// BULK STOCK / DELETE
+// ============================================================================
+
+export const bulkUpdateVariantStock = (updates, tx = null) => {
+  return variantDb.bulkUpdateVariantStock(updates, tx);
+};
+
+export const bulkDeleteVariants = (ids, tx = null) => {
+  return variantDb.bulkDeleteVariants(ids, tx);
+};
+
+// ============================================================================
+// METRICS
+// ============================================================================
+
+export const getVariantMetrics = (tx = null) => {
+  return variantDb.getVariantMetrics(tx);
 };

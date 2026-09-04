@@ -1,4 +1,3 @@
-// middlewares/uploadMiddleware.js
 import multer from "multer";
 import { BadRequestError } from "../classes/errorClasses.js";
 

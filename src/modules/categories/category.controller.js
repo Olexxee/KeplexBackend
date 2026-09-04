@@ -2,8 +2,12 @@ import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
 import * as categoryService from "./category.service.js";
 
+
 export const createCategory = asyncWrapper(async (req, res) => {
-  const category = await categoryService.createCategory(req.body);
+  const category = await categoryService.createCategory(
+    req.body,
+    req.uploadedImage,
+  );
 
   return successResponse({
     res,
@@ -13,22 +17,32 @@ export const createCategory = asyncWrapper(async (req, res) => {
   });
 });
 
+export const getCategories = asyncWrapper(async (req, res) => {
+  const result = await categoryService.getCategories(req.query);
 
- export const getCategories = asyncWrapper(async (req, res) => {
-   const result = await categoryService.getCategories(req.query);
+  return successResponse({
+    res,
+    message: "Categories fetched successfully",
+    data: result.data,
+    meta: result.pagination,
+  });
+});
 
-   return successResponse({
-     res,
-     message: "Categories fetched successfully",
-     data: result.data,
-     meta: result.pagination,
-   });
- });
+export const getCategoryBySlug = asyncWrapper(async (req, res) => {
+  const category = await categoryService.getCategoryBySlug(req.params.slug);
+
+  return successResponse({
+    res,
+    message: "Category fetched successfully",
+    data: category,
+  });
+});
 
 export const updateCategory = asyncWrapper(async (req, res) => {
   const category = await categoryService.updateCategory(
     req.params.id,
     req.body,
+    req.uploadedImage,
   );
 
   return successResponse({

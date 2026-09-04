@@ -1,14 +1,19 @@
 import { Router } from "express";
+
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
+
 import {
-    validateBody,
-    validateParams,
-    validateQuery,
+  validateBody,
+  validateParams,
+  validateQuery,
 } from "../../middlewares/validateMiddleware.js";
-import { upload } from "../../config/multer.js";
-import { processSingleUpload } from "../../middlewares/uploadMiddleware.js";
+
+import { uploadSingleImage } from "../../middlewares/uploadMiddleware.js";
+import { processSingleImage } from "../../middlewares/processItemImages.js";
+
 import * as collectionController from "./collection.controller.js";
+
 import {
   createCollectionSchema,
   updateCollectionSchema,
@@ -19,7 +24,10 @@ import {
 
 const collectionRouter = Router();
 
-// Public routes
+// ============================================================================
+// PUBLIC ROUTES
+// ============================================================================
+
 collectionRouter.get(
   "/",
   validateQuery(getCollectionsQuerySchema),
@@ -38,16 +46,21 @@ collectionRouter.get(
   collectionController.getCollectionById,
 );
 
+// ============================================================================
+// PROTECTED ROUTES
+// ============================================================================
 
 collectionRouter.post(
   "/",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
-  upload.single("image"),
-  processSingleUpload({
-    folder: "keplex-collections",
-  }),
+
+  uploadSingleImage,
+
+  processSingleImage("keplex/collections"),
+
   validateBody(createCollectionSchema),
+
   collectionController.createCollection,
 );
 
@@ -55,12 +68,15 @@ collectionRouter.patch(
   "/:id",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
-  upload.single("image"),
-  processSingleUpload({
-    folder: "keplex-collections",
-  }),
+
+  uploadSingleImage,
+
+  processSingleImage("keplex/collections"),
+
   validateParams(collectionIdSchema),
+
   validateBody(updateCollectionSchema),
+
   collectionController.updateCollection,
 );
 
@@ -68,7 +84,9 @@ collectionRouter.delete(
   "/:id",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN"),
+
   validateParams(collectionIdSchema),
+
   collectionController.deleteCollection,
 );
 
