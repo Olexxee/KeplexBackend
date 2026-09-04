@@ -28,6 +28,16 @@ export const getCategories = asyncWrapper(async (req, res) => {
   });
 });
 
+export const getCategoryById = asyncWrapper(async (req, res) => {
+  const category = await categoryService.getCategoryById(req.params.id);
+
+  return successResponse({
+    res,
+    message: "Category fetched successfully",
+    data: category,
+  });
+});
+
 export const getCategoryBySlug = asyncWrapper(async (req, res) => {
   const category = await categoryService.getCategoryBySlug(req.params.slug);
 

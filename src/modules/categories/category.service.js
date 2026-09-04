@@ -198,6 +198,16 @@ export const updateCategory = async (id, payload, uploadedImage = null) => {
   return normalizeCategoryResponse(updated);
 };
 
+export const getCategoryById = async (id) => {
+  const category = await categoryDb.findCategoryByIdWithRelations(id);
+
+  if (!category) {
+    throw new NotFoundError("Category not found");
+  }
+
+  return normalizeCategoryResponse(category);
+};
+
 export const deleteCategory = async (id) => {
   const category = await categoryDb.findCategoryById(id);
 

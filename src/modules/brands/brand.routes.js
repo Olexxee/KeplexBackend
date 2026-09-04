@@ -7,6 +7,7 @@ import {
   validateParams,
   validateQuery,
 } from "../../middlewares/validateMiddleware.js";
+import {parseMultipartJsonFields} from "../../middlewares/parseMultipartJson.js"
 import { uploadSingleImage } from "../../middlewares/uploadMiddleware.js";
 import { processSingleImage } from "../../middlewares/processItemImages.js";
 import * as brandController from "./brand.controller.js";
@@ -45,7 +46,8 @@ brandRouter.post(
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   uploadSingleImage, // Handle logo upload
-  processSingleImage("keplex/brands"), // Process and upload to Cloudinary
+  processSingleImage("keplex/brands"),
+  parseMultipartJsonFields,
   validateBody(createBrandSchema),
   brandController.createBrand,
 );
@@ -67,6 +69,7 @@ brandRouter.patch(
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   validateParams(brandIdSchema),
   uploadSingleImage,
+  parseMultipartJsonFields,
   processSingleImage("keplex/brands"),
   brandController.updateBrandLogo,
 );

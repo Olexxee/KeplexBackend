@@ -200,6 +200,23 @@ export const deleteProductAggregate = async (id) => {
   const product = await productDb.findProductById(id);
   if (!product) throw new NotFoundError("Product not found");
 
+  const variantIds = product.variants.map((v) => v.id);
+
+  if (variantIds.length > 0) {
+    const [orderItemCount, fulfillmentItemCount] = await Promise.all([
+      prisma.orderItem.count({ where: { variantId: { in: variantIds } } }),
+      prisma.fulfillmentItem.count({
+        where: { variantId: { in: variantIds } },
+      }),
+    ]);
+
+    if (orderItemCount > 0 || fulfillmentItemCount > 0) {
+      throw new ConflictError(
+        "This product has existing orders or fulfillments and cannot be deleted. Archive it instead.",
+      );
+    }
+  }
+
   const mediaToDelete = product.variants.flatMap(
     (variant) => variant.media?.map((m) => m.publicId) ?? [],
   );

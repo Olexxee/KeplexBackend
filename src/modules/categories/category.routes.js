@@ -46,6 +46,12 @@ categoryRouter.get(
 |--------------------------------------------------------------------------
 */
 
+categoryRouter.get(
+  "/:id",
+  validateParams(categoryIdSchema),
+  categoryController.getCategoryById,
+);
+
 categoryRouter.post(
   "/",
   authMiddleware,

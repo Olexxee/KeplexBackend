@@ -152,6 +152,13 @@ export const createCategoryMedia = async (categoryId, data) => {
   });
 };
 
+export const findCategoryByIdWithRelations = async (id) => {
+  return prisma.category.findUnique({
+    where: { id },
+    include: categoryRelations,
+  });
+};
+
 export const clearPrimaryCategoryMedia = async (categoryId) => {
   return prisma.categoryMedia.updateMany({
     where: {
