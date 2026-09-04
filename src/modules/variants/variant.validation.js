@@ -12,7 +12,7 @@ export const createVariantSchema = Joi.object({
   fulfillmentType: Joi.string()
     .valid("LOCAL", "IMPORT", "PREORDER", "DIGITAL")
     .default("LOCAL"),
-  length: Joi.number().min(0).allow(null).optional(),
+  length: Joi.number().min(0).allow(null).optional(), 
   width: Joi.number().min(0).allow(null).optional(),
   height: Joi.number().min(0).allow(null).optional(),
   actualWeight: Joi.number().min(0).required(),

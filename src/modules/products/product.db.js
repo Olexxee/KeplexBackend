@@ -1,83 +1,181 @@
 // modules/products/product.db.js
+
 import { prisma } from "../../config/prisma.js";
 
-const productInclude = {
-  brand: {
+// ============================================================================
+// SHARED INCLUDES
+// ============================================================================
+
+const brandInclude = {
+  select: {
+    id: true,
+    name: true,
+    slug: true,
+    media: {
+      orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+    },
+  },
+};
+
+const categoryInclude = {
+  select: {
+    id: true,
+    name: true,
+    slug: true,
+    type: true,
+  },
+};
+
+const categoryCardInclude = {
+  select: {
+    id: true,
+    name: true,
+    slug: true,
+  },
+};
+
+const collectionInclude = {
+  select: {
+    id: true,
+    name: true,
+    slug: true,
+  },
+};
+
+// ============================================================================
+// VARIANT INCLUDES
+// ============================================================================
+
+const variantMediaInclude = {
+  media: {
+    orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+  },
+};
+
+const variantReviewsInclude = {
+  reviews: {
+    where: { status: "APPROVED" },
     select: {
       id: true,
-      name: true,
-      slug: true,
-      logo: true,
+      rating: true,
+      comment: true,
+      helpfulCount: true,
+      createdAt: true,
+      user: { select: { id: true, fullName: true } },
     },
+    orderBy: { createdAt: "desc" },
   },
-  category: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      type: true,
-    },
+};
+
+// ============================================================================
+// PRODUCT DETAIL
+// ============================================================================
+
+const productDetailVariantsInclude = {
+  where: { isActive: true },
+  include: {
+    ...variantMediaInclude,
+    ...variantReviewsInclude,
   },
-  collection: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-    },
-  },
-  variants: {
-    include: {
-      cartItems: true,
-      orderItems: true,
-      wishlists: true,
-      reviews: {
-        where: {
-          status: "APPROVED",
-        },
-        select: {
-          id: true,
-          rating: true,
-          comment: true,
-          helpfulCount: true,
-          createdAt: true,
-          user: {
-            select: {
-              id: true,
-              fullName: true,
-            },
-          },
-        },
-      },
-    },
-  },
+  orderBy: { createdAt: "asc" },
+};
+
+export const productDetailInclude = {
+  brand: brandInclude,
+  category: categoryInclude,
+  collection: collectionInclude,
+  variants: productDetailVariantsInclude,
   _count: {
-    select: {
-      variants: true,
-      reviews: true,
-    },
+    select: { variants: true },
   },
 };
 
-export const createProduct = (data, tx = prisma) => {
-  return tx.product.create({
-    data,
-    include: productInclude,
-  });
+// ============================================================================
+// PRODUCT CARD
+// ============================================================================
+
+const productCardVariantsInclude = {
+  where: { isActive: true },
+  take: 1,
+  include: {
+    ...variantMediaInclude,
+    reviews: {
+      where: { status: "APPROVED" },
+      select: { rating: true },
+    },
+  },
+  orderBy: { createdAt: "asc" },
 };
 
-export const findProductById = (id, tx = prisma) => {
-  return tx.product.findUnique({
+export const productCardInclude = {
+  brand: brandInclude,
+  category: categoryCardInclude,
+  collection: collectionInclude,
+  variants: productCardVariantsInclude,
+  _count: {
+    select: { variants: true },
+  },
+};
+
+// ============================================================================
+// COMPUTED FIELDS
+// ============================================================================
+
+const getRatings = (product) =>
+  product.variants?.flatMap((v) => v.reviews?.map((r) => r.rating) ?? []) ?? [];
+
+const getAverageRating = (ratings) =>
+  ratings.length
+    ? Number((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1))
+    : 0;
+
+const getPriceRange = (variants = []) => {
+  const prices = variants
+    .map((v) => Number(v.price))
+    .filter((p) => Number.isFinite(p));
+  if (!prices.length) return { min: null, max: null };
+  return { min: Math.min(...prices), max: Math.max(...prices) };
+};
+
+const addComputedFields = (product) => {
+  const ratings = getRatings(product);
+  return {
+    ...product,
+    avgRating: getAverageRating(ratings),
+    totalReviews: ratings.length,
+    priceRange: getPriceRange(product.variants),
+  };
+};
+
+// ============================================================================
+// CRUD
+// ============================================================================
+
+export const createProduct = (data, tx = prisma) =>
+  tx.product.create({ data, include: productDetailInclude });
+
+export const findProductById = (id, tx = prisma) =>
+  tx.product.findUnique({ where: { id }, include: productDetailInclude });
+
+export const findProductBySlug = (slug, tx = prisma) =>
+  tx.product.findUnique({ where: { slug }, include: productDetailInclude });
+
+export const updateProduct = (id, data, tx = prisma) =>
+  tx.product.update({ where: { id }, data, include: productDetailInclude });
+
+export const updateProductStatus = (id, status, tx = prisma) =>
+  tx.product.update({
     where: { id },
-    include: productInclude,
+    data: { status },
+    include: productDetailInclude,
   });
-};
 
-export const findProductBySlug = (slug, tx = prisma) => {
-  return tx.product.findUnique({
-    where: { slug },
-    include: productInclude,
-  });
-};
+export const deleteProduct = (id, tx = prisma) =>
+  tx.product.delete({ where: { id } });
+
+// ============================================================================
+// LISTS
+// ============================================================================
 
 export const findProducts = async (
   {
@@ -107,17 +205,18 @@ export const findProducts = async (
     ...(typeof isFeatured === "boolean" && { isFeatured }),
     ...(typeof isNew === "boolean" && { isNew }),
     ...(typeof isBestSeller === "boolean" && { isBestSeller }),
-    ...(minPrice !== undefined && {
+    ...((minPrice !== undefined || maxPrice !== undefined || search) && {
       variants: {
         some: {
-          price: { gte: minPrice },
-        },
-      },
-    }),
-    ...(maxPrice !== undefined && {
-      variants: {
-        some: {
-          price: { lte: maxPrice },
+          ...(minPrice !== undefined || maxPrice !== undefined
+            ? {
+                price: {
+                  ...(minPrice !== undefined && { gte: minPrice }),
+                  ...(maxPrice !== undefined && { lte: maxPrice }),
+                },
+              }
+            : {}),
+          ...(search ? { sku: { contains: search, mode: "insensitive" } } : {}),
         },
       },
     }),
@@ -127,306 +226,107 @@ export const findProducts = async (
         { description: { contains: search, mode: "insensitive" } },
         {
           variants: {
-            some: {
-              sku: { contains: search, mode: "insensitive" },
-            },
+            some: { sku: { contains: search, mode: "insensitive" } },
           },
         },
       ],
     }),
   };
 
-  const orderBy = {
-    [sortBy]: sortOrder,
-  };
-
-  let include = {
-    brand: {
-      select: { id: true, name: true, slug: true },
-    },
-    category: {
-      select: { id: true, name: true, slug: true },
-    },
-    collection: {
-      select: { id: true, name: true, slug: true },
-    },
-    _count: {
-      select: {
-        variants: true,
-        reviews: true,
-      },
-    },
-  };
-
-  if (includeVariants) {
-    include = {
-      ...include,
-      variants: {
-        where: { isActive: true },
-        include: {
-          reviews: {
-            where: { status: "APPROVED" },
-            select: {
-              rating: true,
-            },
-          },
-        },
-      },
-    };
-  }
+  const orderBy = { [sortBy]: sortOrder };
+  const include = includeVariants
+    ? productCardInclude
+    : {
+        brand: brandInclude,
+        category: categoryCardInclude,
+        collection: collectionInclude,
+        _count: { select: { variants: true } },
+      };
 
   const [products, total] = await Promise.all([
-    tx.product.findMany({
-      where,
-      include,
-      skip,
-      take,
-      orderBy,
-    }),
+    tx.product.findMany({ where, include, skip, take, orderBy }),
     tx.product.count({ where }),
   ]);
 
-  const productsWithRating = products.map((product) => {
-    const allRatings =
-      product.variants?.flatMap((v) => v.reviews?.map((r) => r.rating) || []) ||
-      [];
-
-    const avgRating =
-      allRatings.length > 0
-        ? allRatings.reduce((a, b) => a + b, 0) / allRatings.length
-        : 0;
-
-    const lowestPrice =
-      product.variants?.length > 0
-        ? Math.min(...product.variants.map((v) => Number(v.price)))
-        : null;
-
-    const highestPrice =
-      product.variants?.length > 0
-        ? Math.max(...product.variants.map((v) => Number(v.price)))
-        : null;
-
-    return {
-      ...product,
-      avgRating: parseFloat(avgRating.toFixed(1)),
-      priceRange: {
-        min: lowestPrice,
-        max: highestPrice,
-      },
-      totalReviews: allRatings.length,
-    };
-  });
-
-  return {
-    products: productsWithRating,
-    total,
-  };
+  return { products: products.map(addComputedFields), total };
 };
+
+// ============================================================================
+// SPECIAL LISTS
+// ============================================================================
 
 export const findFeaturedProducts = (
   { limit = 10, categoryId } = {},
   tx = prisma,
-) => {
-  const where = {
-    isFeatured: true,
-    status: "ACTIVE",
-    ...(categoryId && { categoryId }),
-  };
-
-  return tx.product.findMany({
-    where,
-    include: {
-      brand: {
-        select: { id: true, name: true, slug: true },
-      },
-      category: {
-        select: { id: true, name: true, slug: true },
-      },
-      variants: {
-        where: { isActive: true },
-        take: 1,
-      },
-      _count: {
-        select: {
-          variants: true,
-          reviews: true,
-        },
-      },
+) =>
+  tx.product.findMany({
+    where: {
+      isFeatured: true,
+      status: "ACTIVE",
+      ...(categoryId && { categoryId }),
     },
+    include: productCardInclude,
     orderBy: { createdAt: "desc" },
     take: limit,
   });
-};
 
-export const findNewArrivals = (
-  { limit = 10, categoryId } = {},
-  tx = prisma,
-) => {
-  const where = {
-    isNew: true,
-    status: "ACTIVE",
-    ...(categoryId && { categoryId }),
-  };
-
-  return tx.product.findMany({
-    where,
-    include: {
-      brand: {
-        select: { id: true, name: true, slug: true },
-      },
-      category: {
-        select: { id: true, name: true, slug: true },
-      },
-      variants: {
-        where: { isActive: true },
-        take: 1,
-      },
-      _count: {
-        select: {
-          variants: true,
-          reviews: true,
-        },
-      },
+export const findNewArrivals = ({ limit = 10, categoryId } = {}, tx = prisma) =>
+  tx.product.findMany({
+    where: {
+      isNew: true,
+      status: "ACTIVE",
+      ...(categoryId && { categoryId }),
     },
+    include: productCardInclude,
     orderBy: { createdAt: "desc" },
     take: limit,
   });
-};
 
-export const findBestSellers = (
-  { limit = 10, categoryId } = {},
-  tx = prisma,
-) => {
-  const where = {
-    isBestSeller: true,
-    status: "ACTIVE",
-    ...(categoryId && { categoryId }),
-  };
-
-  return tx.product.findMany({
-    where,
-    include: {
-      brand: {
-        select: { id: true, name: true, slug: true },
-      },
-      category: {
-        select: { id: true, name: true, slug: true },
-      },
-      variants: {
-        where: { isActive: true },
-        take: 1,
-      },
-      _count: {
-        select: {
-          variants: true,
-          reviews: true,
-        },
-      },
+export const findBestSellers = ({ limit = 10, categoryId } = {}, tx = prisma) =>
+  tx.product.findMany({
+    where: {
+      isBestSeller: true,
+      status: "ACTIVE",
+      ...(categoryId && { categoryId }),
     },
+    include: productCardInclude,
     orderBy: { createdAt: "desc" },
     take: limit,
   });
-};
 
-export const updateProduct = (id, data, tx = prisma) => {
-  return tx.product.update({
-    where: { id },
-    data,
-    include: productInclude,
-  });
-};
+// ============================================================================
+// RELATIONS
+// ============================================================================
 
-export const deleteProduct = (id, tx = prisma) => {
-  return tx.product.delete({
-    where: { id },
-    include: {
-      variants: true,
-    },
-  });
-};
-
-export const updateProductStatus = (id, status, tx = prisma) => {
-  return tx.product.update({
-    where: { id },
-    data: { status },
-    include: productInclude,
-  });
-};
-
-export const getProductVariants = (productId, tx = prisma) => {
-  return tx.productVariant.findMany({
+export const getProductVariants = (productId, tx = prisma) =>
+  tx.productVariant.findMany({
     where: { productId },
     include: {
-      product: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-        },
-      },
-      cartItems: true,
-      orderItems: true,
-      wishlists: true,
-      reviews: {
-        where: { status: "APPROVED" },
-        select: {
-          id: true,
-          rating: true,
-          comment: true,
-          createdAt: true,
-          user: {
-            select: {
-              id: true,
-              fullName: true,
-            },
-          },
-        },
-      },
+      product: { select: { id: true, name: true, slug: true } },
+      ...variantMediaInclude,
+      ...variantReviewsInclude,
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
   });
-};
 
-export const getRelatedProducts = (productId, limit = 6, tx = prisma) => {
-  return tx.product
-    .findUnique({
-      where: { id: productId },
-      select: {
-        categoryId: true,
-        brandId: true,
-      },
-    })
-    .then((product) => {
-      if (!product) return [];
+export const getRelatedProducts = async (productId, limit = 6, tx = prisma) => {
+  const product = await tx.product.findUnique({
+    where: { id: productId },
+    select: { categoryId: true, brandId: true },
+  });
+  if (!product) return [];
 
-      return tx.product.findMany({
-        where: {
-          id: { not: productId },
-          status: "ACTIVE",
-          OR: [
-            { categoryId: product.categoryId },
-            { brandId: product.brandId },
-          ],
-        },
-        include: {
-          brand: {
-            select: { id: true, name: true, slug: true },
-          },
-          category: {
-            select: { id: true, name: true, slug: true },
-          },
-          variants: {
-            where: { isActive: true },
-            take: 1,
-          },
-          _count: {
-            select: {
-              variants: true,
-              reviews: true,
-            },
-          },
-        },
-        take: limit,
-      });
-    });
+  return tx.product.findMany({
+    where: {
+      id: { not: productId },
+      status: "ACTIVE",
+      OR: [
+        { categoryId: product.categoryId },
+        ...(product.brandId ? [{ brandId: product.brandId }] : []),
+      ],
+    },
+    include: productCardInclude,
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
 };

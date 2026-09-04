@@ -1,0 +1,2208 @@
+{
+  "info": {
+    "name": "Keplex Shopping API",
+    "description": "Complete API collection for Keplex Shopping V2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "auth": {
+    "type": "cookie",
+    "cookie": [
+      {
+        "key": "accessToken",
+        "value": "{{accessToken}}",
+        "domain": "{{baseUrl}}",
+        "path": "/"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "variantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fulfillmentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "warehouseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "brandId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "collectionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Public & Customer Endpoints",
+      "item": [
+        {
+          "name": "🏠 Products (Public)",
+          "item": [
+            {
+              "name": "Get All Products",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products?page=1&limit=10&isFeatured=true",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "isFeatured",
+                      "value": "true"
+                    },
+                    {
+                      "key": "search",
+                      "value": "nike",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Featured Products",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/featured?limit=6",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "featured"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "6"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get New Arrivals",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/new-arrivals?limit=6",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "new-arrivals"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "6"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Best Sellers",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/best-sellers?limit=6",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "best-sellers"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "6"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Product by Slug",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/slug/nike-air-max",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "slug", "nike-air-max"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Product by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Product Variants",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}", "variants"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Related Products",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}/related?limit=4",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}", "related"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "4"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🏷️ Brands (Public)",
+          "item": [
+            {
+              "name": "Get All Brands",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands?page=1&limit=20&isActive=true",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Brand by Slug",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands/slug/nike",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands", "slug", "nike"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Brand by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands/{{brandId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands", "{{brandId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "📂 Collections (Public)",
+          "item": [
+            {
+              "name": "Get All Collections",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/collections?page=1&limit=20&isActive=true",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "collections"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Collection by Slug",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/collections/slug/summer-sale",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "collections", "slug", "summer-sale"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Collection by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/collections/{{collectionId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "collections", "{{collectionId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🛒 Cart (Customer)",
+          "item": [
+            {
+              "name": "Get Cart",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Cart Summary",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/summary",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "summary"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Validate Cart",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/validate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "validate"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add Item to Cart",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"variantId\": \"{{variantId}}\",\n    \"quantity\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/items",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "items"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Cart Item Quantity",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"quantity\": 3\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/items/{{variantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "items", "{{variantId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Remove Item from Cart",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/items/{{variantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "items", "{{variantId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Clear Cart",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/clear",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "clear"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Merge Guest Cart",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"sessionId\": \"guest_session_123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cart/merge",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cart", "merge"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "📦 Orders (Customer)",
+          "item": [
+            {
+              "name": "Checkout",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"addressId\": \"{{addressId}}\",\n    \"notes\": \"Please deliver during business hours\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/checkout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "checkout"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get My Orders",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/me?page=1&limit=10&status=COMPLETED",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "me"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "status",
+                      "value": "COMPLETED"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Order Timeline",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/me/timeline/{{orderId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "me", "timeline", "{{orderId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Order by Number",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/by-number/KEP-ABC123",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "by-number", "KEP-ABC123"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Order by ID",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "{{orderId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "💳 Payments (Customer)",
+          "item": [
+            {
+              "name": "Initialize Payment",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/payments/order/{{orderId}}/init",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "payments", "order", "{{orderId}}", "init"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Verify Payment",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/payments/verify/KPX-ORDER-123456",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "payments", "verify", "KPX-ORDER-123456"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🔔 Notifications (Customer)",
+          "item": [
+            {
+              "name": "Get My Notifications",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "notifications"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Unread Count",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/unread-count",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "notifications", "unread-count"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Mark All as Read",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/read-all",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "notifications", "read-all"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Mark Notification as Read",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "notifications", "{{notificationId}}", "read"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Notification",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/{{notificationId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "notifications", "{{notificationId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Notification Preferences",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/preferences",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "notifications", "preferences"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Notification Preferences",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"orderEmails\": true,\n    \"orderStatusEmails\": true,\n    \"trainingEmails\": false,\n    \"marketingEmails\": false\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/preferences",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "notifications", "preferences"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Admin Endpoints - Catalog",
+      "item": [
+        {
+          "name": "📦 Products (Admin)",
+          "item": [
+            {
+              "name": "Create Product",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Nike Air Max 2024\",\n    \"slug\": \"nike-air-max-2024\",\n    \"description\": \"The latest Nike Air Max with superior comfort and style.\",\n    \"categoryId\": \"{{categoryId}}\",\n    \"brandId\": \"{{brandId}}\",\n    \"collectionId\": \"{{collectionId}}\",\n    \"isFeatured\": true,\n    \"isNew\": true,\n    \"isBestSeller\": false,\n    \"status\": \"ACTIVE\",\n    \"variants\": [\n        {\n            \"sku\": \"NIKE-AM-BLK-42\",\n            \"color\": \"Black\",\n            \"size\": \"42\",\n            \"price\": 25000,\n            \"compareAtPrice\": 30000,\n            \"stock\": 50,\n            \"weight\": 0.5,\n            \"actualWeight\": 0.5,\n            \"fulfillmentType\": \"LOCAL\",\n            \"shippingType\": \"LOCAL\",\n            \"length\": 30,\n            \"width\": 20,\n            \"height\": 10,\n            \"isActive\": true\n        },\n        {\n            \"sku\": \"NIKE-AM-BLK-43\",\n            \"color\": \"Black\",\n            \"size\": \"43\",\n            \"price\": 25000,\n            \"compareAtPrice\": 30000,\n            \"stock\": 30,\n            \"weight\": 0.5,\n            \"actualWeight\": 0.5,\n            \"fulfillmentType\": \"LOCAL\",\n            \"shippingType\": \"LOCAL\",\n            \"length\": 30,\n            \"width\": 20,\n            \"height\": 10,\n            \"isActive\": true\n        }\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/products",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "products"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Product",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Nike Air Max 2024 - Updated\",\n    \"isFeatured\": false\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/products/{{productId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "products", "{{productId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Product Status",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"status\": \"ARCHIVED\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/products/{{productId}}/status",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "products", "{{productId}}", "status"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Product",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/products/{{productId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "products", "{{productId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🏷️ Brands (Admin)",
+          "item": [
+            {
+              "name": "Create Brand",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Nike\",\n    \"slug\": \"nike\",\n    \"logo\": \"https://example.com/nike-logo.png\",\n    \"description\": \"Leading sportswear brand\",\n    \"isActive\": true,\n    \"sortOrder\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/brands",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "brands"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Brand",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Nike Inc.\",\n    \"isActive\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/brands/{{brandId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "brands", "{{brandId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Brand",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/brands/{{brandId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "brands", "{{brandId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "📂 Collections (Admin)",
+          "item": [
+            {
+              "name": "Create Collection",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Summer Sale 2024\",\n    \"slug\": \"summer-sale-2024\",\n    \"description\": \"Hot summer deals on all products\",\n    \"image\": \"https://example.com/summer-sale.jpg\",\n    \"isActive\": true,\n    \"sortOrder\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/collections",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "collections"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Collection",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Winter Sale 2024\",\n    \"isActive\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/collections/{{collectionId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "collections", "{{collectionId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Collection",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/collections/{{collectionId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "collections", "{{collectionId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "📊 Categories (Admin)",
+          "item": [
+            {
+              "name": "Create Category",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Footwear\",\n    \"slug\": \"footwear\",\n    \"description\": \"All types of footwear\",\n    \"type\": \"PRODUCT\",\n    \"isActive\": true,\n    \"sortOrder\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/categories",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "categories"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Category",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Sports Footwear\",\n    \"isActive\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/categories/{{categoryId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "categories", "{{categoryId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Category",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/categories/{{categoryId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "categories", "{{categoryId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Admin Endpoints - Orders & Fulfillment",
+      "item": [
+        {
+          "name": "📦 Orders (Admin)",
+          "item": [
+            {
+              "name": "Get All Orders",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/orders?page=1&limit=20&status=PENDING",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "orders"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "status",
+                      "value": "PENDING"
+                    },
+                    {
+                      "key": "search",
+                      "value": "KEP-",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Order Metrics",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/orders/metrics",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "orders", "metrics"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Order by ID",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/orders/{{orderId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "orders", "{{orderId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Order Status",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"status\": \"CONFIRMED\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/orders/{{orderId}}/status",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "orders", "{{orderId}}", "status"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Order CBM",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"totalCBM\": 2.5,\n    \"totalChargeableWeight\": 1500,\n    \"items\": [\n        {\n            \"variantId\": \"{{variantId}}\",\n            \"cbm\": 1.2,\n            \"chargeableWeight\": 700\n        }\n    ],\n    \"measurements\": {\n        \"length\": 120,\n        \"width\": 80,\n        \"height\": 60\n    },\n    \"notes\": \"Measured by warehouse team\",\n    \"additionalCharge\": 5000,\n    \"paymentLink\": \"https://paystack.com/pay/cbm-additional\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/orders/{{orderId}}/cbm",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "orders", "{{orderId}}", "cbm"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Orders by Fulfillment Type",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/orders/fulfillment/LOCAL",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "orders", "fulfillment", "LOCAL"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Order Timeline",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/orders/{{orderId}}/timeline",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "orders", "{{orderId}}", "timeline"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🚚 Fulfillments (Admin)",
+          "item": [
+            {
+              "name": "Get All Fulfillments",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/fulfillments?page=1&limit=20&status=PENDING",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "fulfillments"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "status",
+                      "value": "PENDING"
+                    },
+                    {
+                      "key": "type",
+                      "value": "LOCAL",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Fulfillment by ID",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/fulfillments/{{fulfillmentId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "fulfillments", "{{fulfillmentId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Fulfillments by Order",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/fulfillments/order/{{orderId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "fulfillments", "order", "{{orderId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Fulfillment Status",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"status\": \"PROCESSING\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/fulfillments/{{fulfillmentId}}/status",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "fulfillments", "{{fulfillmentId}}", "status"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Fulfillment Tracking",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"trackingNumber\": \"DHL-123456789\",\n    \"carrier\": \"DHL\",\n    \"trackingUrl\": \"https://www.dhl.com/track/123456789\",\n    \"estimatedDelivery\": \"2025-01-20T00:00:00.000Z\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/fulfillments/{{fulfillmentId}}/tracking",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "fulfillments", "{{fulfillmentId}}", "tracking"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Generate Fulfillments for Order",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/fulfillments/order/{{orderId}}/generate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "fulfillments", "order", "{{orderId}}", "generate"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Fulfillment",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/fulfillments/{{fulfillmentId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "fulfillments", "{{fulfillmentId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🏭 Warehouses (Admin)",
+          "item": [
+            {
+              "name": "Get All Warehouses",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/warehouses?page=1&limit=20&isActive=true",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "warehouses"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "true"
+                    },
+                    {
+                      "key": "search",
+                      "value": "Lagos",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Warehouse by ID",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/warehouses/{{warehouseId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "warehouses", "{{warehouseId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Warehouse",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Lagos Main Warehouse\",\n    \"code\": \"LAG-001\",\n    \"address\": \"123 Main Street, Ikeja\",\n    \"city\": \"Lagos\",\n    \"state\": \"Lagos\",\n    \"country\": \"NG\",\n    \"isActive\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/warehouses",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "warehouses"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Warehouse",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Lagos Central Warehouse\",\n    \"isActive\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/warehouses/{{warehouseId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "warehouses", "{{warehouseId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Warehouse",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/warehouses/{{warehouseId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "warehouses", "{{warehouseId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "📦 Shipping (Admin)",
+          "item": [
+            {
+              "name": "Get All Shipping Configs",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/shipping/configs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "shipping", "configs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Shipping Config",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Local Shipping\",\n    \"type\": \"LOCAL\",\n    \"isActive\": true,\n    \"pricePerKg\": 500,\n    \"minCharge\": 1000,\n    \"handlingFee\": 200,\n    \"freeShippingThreshold\": 50000,\n    \"deliveryEstimateMin\": 1,\n    \"deliveryEstimateMax\": 3\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/shipping/configs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "shipping", "configs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Sea Freight Config",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Sea Freight\",\n    \"type\": \"SEA\",\n    \"isActive\": true,\n    \"pricePerCBM\": 50000,\n    \"cbmHandlingFee\": 5000,\n    \"cbmMinCharge\": 10000,\n    \"deliveryEstimateMin\": 14,\n    \"deliveryEstimateMax\": 30\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/shipping/configs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "shipping", "configs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get All Shipping Rules",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/shipping/rules?isActive=true",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "shipping", "rules"],
+                  "query": [
+                    {
+                      "key": "isActive",
+                      "value": "true"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Shipping Rule",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Lagos Zone\",\n    \"type\": \"ZONE\",\n    \"zone\": \"Lagos\",\n    \"baseRate\": 1000,\n    \"ratePerKg\": 200,\n    \"isActive\": true,\n    \"priority\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/shipping/rules",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "shipping", "rules"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Calculate Variant CBM",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/shipping/cbm/variant/{{variantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "shipping", "cbm", "variant", "{{variantId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Admin Endpoints - System & Reports",
+      "item": [
+        {
+          "name": "👥 Users (Admin)",
+          "item": [
+            {
+              "name": "Get All Users",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users?page=1&limit=20&role=CUSTOMER",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "role",
+                      "value": "CUSTOMER"
+                    },
+                    {
+                      "key": "search",
+                      "value": "john",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get User by ID",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users", "{{userId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Staff",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@keplex.com\",\n    \"password\": \"SecurePass123\",\n    \"role\": \"staff\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/staff",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "staff"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update User Role",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users/{{userId}}/role",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users", "{{userId}}", "role"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update User Status",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"status\": \"SUSPENDED\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/users/{{userId}}/status",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "users", "{{userId}}", "status"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "📊 Dashboard (Admin)",
+          "item": [
+            {
+              "name": "Get Dashboard Metrics",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/dashboard/metrics",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "dashboard", "metrics"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Recent Orders",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/dashboard/recent-orders?limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "dashboard", "recent-orders"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Low Stock Items",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/dashboard/low-stock?threshold=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "dashboard", "low-stock"],
+                  "query": [
+                    {
+                      "key": "threshold",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "📈 Reports (Admin)",
+          "item": [
+            {
+              "name": "Get Revenue Report",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/revenue?period=monthly&year=2024",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "revenue"],
+                  "query": [
+                    {
+                      "key": "period",
+                      "value": "monthly"
+                    },
+                    {
+                      "key": "year",
+                      "value": "2024"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Sales Report",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/sales?startDate=2024-01-01&endDate=2024-12-31",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "sales"],
+                  "query": [
+                    {
+                      "key": "startDate",
+                      "value": "2024-01-01"
+                    },
+                    {
+                      "key": "endDate",
+                      "value": "2024-12-31"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Inventory Report",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/inventory",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "inventory"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Product Performance",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/reports/product-performance?top=10&period=monthly",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "reports", "product-performance"],
+                  "query": [
+                    {
+                      "key": "top",
+                      "value": "10"
+                    },
+                    {
+                      "key": "period",
+                      "value": "monthly"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "⚙️ Business Config (Admin)",
+          "item": [
+            {
+              "name": "Get All Configs",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/config",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "config"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Config by Key",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/config/store_settings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "config", "store_settings"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Config",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"value\": {\n        \"storeName\": \"Keplex Shop\",\n        \"currency\": \"NGN\",\n        \"timezone\": \"Africa/Lagos\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/config/store_settings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "config", "store_settings"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🔔 Promo Notifications (Admin)",
+          "item": [
+            {
+              "name": "Send Promo Email to All",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"subject\": \"Summer Sale - Up to 50% Off!\",\n    \"title\": \"☀️ Summer Sale is Here!\",\n    \"body\": \"Get up to 50% off on all products. Limited time offer. Shop now!\",\n    \"ctaUrl\": \"https://keplex.com/summer-sale\",\n    \"ctaLabel\": \"Shop Now\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/notifications/promo",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "notifications", "promo"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "🔐 Auth (Public)",
+          "item": [
+            {
+              "name": "Register",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"fullName\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"08012345678\",\n    \"password\": \"SecurePass123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/register",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "register"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Login",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"admin@keplex.com\",\n    \"password\": \"AdminPass123\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "login"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Refresh Token",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/refresh",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "refresh"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "logout"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Current User",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Current User",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"fullName\": \"Jane Doe\",\n    \"phone\": \"08087654321\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Change Password",
+              "request": {
+                "auth": {
+                  "type": "cookie"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"currentPassword\": \"OldPass123\",\n    \"newPassword\": \"NewPass456\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/change-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "change-password"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

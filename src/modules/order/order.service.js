@@ -1,4 +1,3 @@
-// modules/orders/order.service.js
 import { prisma } from "../../config/prisma.js";
 import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
 import * as checkoutService from "../checkout/checkout.service.js";
@@ -8,7 +7,6 @@ import {
   getPaginationParams,
   formatPaginatedResponse,
 } from "../../lib/pagination.js";
-import { CBMCalculator } from "../shipping/cbm.calculator.js";
 
 export const getMyOrders = async (userId, filters) => {
   const { page, limit, status, search, startDate, endDate } = filters;
@@ -149,9 +147,16 @@ export const checkout = async ({ userId, payload }) => {
   });
 };
 
-export const getOrderTimeline = async (orderId) => {
+export const getOrderTimeline = async (orderId, user) => {
   const order = await orderDb.findOrderById(orderId);
   if (!order) {
+    throw new NotFoundError("Order not found");
+  }
+
+  const isOwner = order.userId === user.id;
+  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
+
+  if (!isOwner && !isAdmin) {
     throw new NotFoundError("Order not found");
   }
 
@@ -205,6 +210,9 @@ export const getOrderTimeline = async (orderId) => {
     });
   }
 
+  // Sort timeline by timestamp
+  timeline.sort((a, b) => a.timestamp - b.timestamp);
+
   return timeline;
 };
 
@@ -227,9 +235,11 @@ export const updateOrderCBM = async (orderId, cbmData, adminUserId) => {
     const updatedOrder = await orderDb.updateOrderCBM(
       orderId,
       {
-        ...cbmData,
-        updatedBy: adminUserId,
-        updatedAt: new Date(),
+        cbm: cbmData.totalCBM,
+        chargeableWeight: cbmData.chargeableWeight || cbmData.totalCBM * 1000,
+        cbmData: cbmData,
+        cbmUpdatedAt: new Date(),
+        cbmUpdatedBy: adminUserId,
       },
       tx,
     );
@@ -260,37 +270,4 @@ export const getOrderMetrics = async () => {
 
 export const getOrdersByFulfillmentType = async (fulfillmentType) => {
   return orderDb.findOrdersByFulfillmentType(fulfillmentType);
-};
-
-/**
- * Calculate CBM for cart items (helper function)
- */
-export const calculateCartCBM = (cart) => {
-  if (!cart || !cart.items) return [];
-
-  return cart.items.map((cartItem) => {
-    const variant = cartItem.variant;
-    let itemCBM = 0;
-    let chargeableWeight = 0;
-
-    if (variant?.length && variant?.width && variant?.height) {
-      // Calculate CBM
-      const lengthM = Number(variant.length) / 100;
-      const widthM = Number(variant.width) / 100;
-      const heightM = Number(variant.height) / 100;
-      itemCBM = lengthM * widthM * heightM * cartItem.quantity;
-
-      // Calculate chargeable weight
-      const actualWeight =
-        Number(variant.actualWeight || 0) * cartItem.quantity;
-      const volumetricWeight = itemCBM * 1000; // 1 CBM = 1000 kg for sea freight
-      chargeableWeight = Math.max(actualWeight, volumetricWeight);
-    }
-
-    return {
-      ...cartItem,
-      cbm: parseFloat(itemCBM.toFixed(4)),
-      chargeableWeight: parseFloat(chargeableWeight.toFixed(2)),
-    };
-  });
 };

@@ -1,6 +1,6 @@
 import { ValidationError } from "../classes/errorClasses.js";
 
-const validate = (schema, source) => {
+export const validate = (schema, source = "body") => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req[source], {
       abortEarly: false,
@@ -8,20 +8,18 @@ const validate = (schema, source) => {
     });
 
     if (error) {
-      const details = error.details.map((detail) => ({
-        field: detail.path.join("."),
-        message: detail.message,
-      }));
+      console.error("❌ VALIDATION ERROR");
+      console.error("Source:", source);
+      console.error("Received:", req[source]);
+      console.error("Details:", error.details);
 
-      return next(new ValidationError("Validation failed", details));
+      return next(
+        new ValidationError("Validation failed"),
+      );
     }
 
-    if (source === "body") {
-      req.body = value;
-    } else {
-      if (!req.validated) req.validated = {};
-      req.validated[source] = value;
-    }
+    req.validated = req.validated || {};
+    req.validated[source] = value;
 
     next();
   };

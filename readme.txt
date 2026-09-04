@@ -216,3 +216,41 @@ backend/
 npx prisma migrate dev --name add_product_variants_cbm
 npx prisma migrate dev --name add_shipping_models
 npx prisma migrate dev --name add_fulfillment_models
+
+🔐 Test accounts
+------------------------------------------
+Super Admin:
+  Email:    superadmin@keplex.test
+  Password: Password123!
+
+Admin:
+  Email:    admin@keplex.test
+  Password: Password123!
+
+Staff:
+  Email:    staff@keplex.test
+  Password: Password123!
+
+Customer:
+  Email:    john@keplex.test
+  Password: Password123!
+
+Customer:
+  Email:    jane@keplex.test
+  Password: Password123!
+
+Customer:
+  Email:    michael@keplex.test
+  Password: Password123!
+------------------------------------------
+
+📊 Seeded:
+   Users:        6
+   Categories:   6
+   Brands:       6
+   Collections:  4
+   Products:     13
+   Warehouse:    1
+   Orders:       3
+   Reviews:      4
+   Training:     2

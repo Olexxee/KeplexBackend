@@ -1,4 +1,3 @@
-// modules/reviews/review.service.js
 import {
   NotFoundError,
   BadRequestError,
@@ -10,7 +9,7 @@ import {
 } from "../../lib/pagination.js";
 import * as reviewDb from "./review.db.js";
 import * as variantDb from "../variants/variant.db.js";
-import * as orderDb from "../orders/order.db.js";
+import * as orderDb from "../order/order.db.js";
 
 export const createReview = async (userId, payload) => {
   const { variantId, orderId, rating, title, comment, images } = payload;

@@ -1,4 +1,3 @@
-// modules/reviews/review.routes.js
 import { Router } from "express";
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
