@@ -12,9 +12,7 @@ export const loginSchema = Joi.object({
     .trim()
     .lowercase()
     .email({
-      tlds: {
-        allow: ["test"],
-      },
+      tlds: { allow: false },
     })
     .required(),
 
