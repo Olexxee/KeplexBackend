@@ -38,26 +38,54 @@ export const app = express();
 app.use("/api/webhooks", webhookRouter);
 
 // ── CORS ──
+// Normalize helper: strips a single trailing slash so
+// "https://foo.com/" and "https://foo.com" are treated as equal.
+const normalizeOrigin = (url) =>
+  typeof url === "string" ? url.trim().replace(/\/+$/, "") : url;
+
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "https://keplexshopping.vercel.app",
+  "https://atc-shopping.vercel.app",
   "https://keplexregistration.vercel.app",
   env.FRONTEND_URL,
-].filter(Boolean);
+]
+  .filter(Boolean)
+  .map(normalizeOrigin);
+
+// Optional: allow any Vercel *preview* deployment for these projects too,
+// e.g. atc-shopping-git-branchname-yourteam.vercel.app
+// Comment this out if you don't want preview URLs auto-allowed.
+const allowedVercelPreviewPatterns = [
+  /^https:\/\/atc-shopping-[a-z0-9-]+\.vercel\.app$/,
+  /^https:\/\/keplexregistration-[a-z0-9-]+\.vercel\.app$/,
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
+      // No origin (server-to-server, curl, mobile apps, Postman) — allow.
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.error(
-          `[CORS Blocked]: Request from origin ${origin} was denied.`,
-        );
-        callback(new Error("Not allowed by CORS"));
+
+      const normalized = normalizeOrigin(origin);
+
+      const isExactMatch = allowedOrigins.includes(normalized);
+      const isPreviewMatch = allowedVercelPreviewPatterns.some((re) =>
+        re.test(normalized),
+      );
+
+      if (isExactMatch || isPreviewMatch) {
+        return callback(null, true);
       }
+
+      // Log the RAW origin with JSON.stringify so invisible characters,
+      // stray whitespace, or trailing slashes show up in the logs.
+      console.error(
+        `[CORS Blocked] raw origin: ${JSON.stringify(origin)} | normalized: ${JSON.stringify(
+          normalized,
+        )} | allowedOrigins: ${JSON.stringify(allowedOrigins)}`,
+      );
+      callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   }),
