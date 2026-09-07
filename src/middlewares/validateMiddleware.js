@@ -13,10 +13,14 @@ export const validate = (schema, source = "body") => {
       console.error("Received:", req[source]);
       console.error("Details:", error.details);
 
-      return next(
-        new ValidationError("Validation failed"),
-      );
+      return next(new ValidationError("Validation failed"));
     }
+
+    // Write the validated/converted value back onto req[source] itself —
+    // controllers and services read req.body/req.params/req.query directly,
+    // so this is what actually applies Joi's type coercion (e.g. "true" -> true,
+    // "1" -> 1) to what downstream code sees.
+    req[source] = value;
 
     req.validated = req.validated || {};
     req.validated[source] = value;
