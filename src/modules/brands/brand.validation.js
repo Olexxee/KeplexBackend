@@ -1,4 +1,3 @@
-// modules/brands/brand.validation.js
 import Joi from "joi";
 
 export const createBrandSchema = Joi.object({

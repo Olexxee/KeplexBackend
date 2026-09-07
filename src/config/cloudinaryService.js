@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
  * @param {string} options.folder - Cloudinary folder
  * @param {string} [options.publicId] - Optional public ID; auto-generated if not provided
  * @param {string} [options.resourceType="image"] - Resource type (image, video, raw)
- * @returns {Promise<{url, publicId, resourceType, format, bytes}>}
+ * @returns {Promise<{url, publicId, resourceType, format, bytes, width, height}>}
  */
 export const uploadBufferToCloudinary = async (buffer, options = {}) => {
   const { folder, publicId, resourceType = "image" } = options;
@@ -17,7 +17,10 @@ export const uploadBufferToCloudinary = async (buffer, options = {}) => {
     throw new Error("Invalid buffer provided for Cloudinary upload.");
   }
 
-  const finalPublicId = publicId || `${folder || "uploads"}/${uuidv4()}`;
+  // NOTE: don't prepend `folder` here — the `folder` option passed to
+  // upload_stream below already gets combined with public_id by Cloudinary.
+  // Prepending it ourselves as well produced doubled paths like
+  const finalPublicId = publicId || uuidv4();
 
   return new Promise((resolve, reject) => {
     cloudinary.uploader
@@ -37,6 +40,8 @@ export const uploadBufferToCloudinary = async (buffer, options = {}) => {
             resourceType: result.resource_type,
             format: result.format,
             bytes: result.bytes,
+            width: result.width,
+            height: result.height,
           });
         },
       )
