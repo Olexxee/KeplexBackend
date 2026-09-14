@@ -9,7 +9,7 @@ export const productIdSchema = Joi.object({
 });
 
 export const batchCheckWishlistSchema = Joi.object({
-  productIds: Joi.array().items(Joi.string()).min(1).required(),
+  productIds: Joi.array().items(Joi.string().required()).min(1).required(),
 });
 
 export const getWishlistQuerySchema = Joi.object({
