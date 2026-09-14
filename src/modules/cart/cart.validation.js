@@ -1,4 +1,3 @@
-// modules/cart/cart.validation.js
 import Joi from "joi";
 
 export const addCartItemSchema = Joi.object({

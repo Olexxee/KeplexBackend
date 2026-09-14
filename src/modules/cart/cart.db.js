@@ -1,4 +1,3 @@
-// modules/cart/cart.db.js
 import { prisma } from "../../config/prisma.js";
 
 const cartInclude = {
@@ -142,6 +141,72 @@ export const deleteCartItem = async ({ cartId, variantId }) => {
           product: true,
         },
       },
+    },
+  });
+};
+
+export const findActiveCartBySessionId = async (sessionId) => {
+  return prisma.cart.findFirst({
+    where: {
+      sessionId,
+      status: "ACTIVE",
+    },
+    include: cartInclude,
+  });
+};
+
+export const mergeGuestCartIntoUserCart = async ({
+  guestCartId,
+  userCartId,
+  items,
+}) => {
+  return prisma.$transaction(async (tx) => {
+    for (const item of items) {
+      const existingItem = await tx.cartItem.findUnique({
+        where: {
+          cartId_variantId: {
+            cartId: userCartId,
+            variantId: item.variantId,
+          },
+        },
+      });
+
+      if (existingItem) {
+        await tx.cartItem.update({
+          where: {
+            cartId_variantId: {
+              cartId: userCartId,
+              variantId: item.variantId,
+            },
+          },
+          data: {
+            quantity: existingItem.quantity + item.quantity,
+          },
+        });
+      } else {
+        await tx.cartItem.create({
+          data: {
+            cartId: userCartId,
+            variantId: item.variantId,
+            quantity: item.quantity,
+            unitPriceSnapshot: item.unitPriceSnapshot,
+          },
+        });
+      }
+    }
+
+    await tx.cart.delete({
+      where: {
+        id: guestCartId,
+      },
+    });
+  });
+};
+
+export const deleteCartById = async (cartId) => {
+  return prisma.cart.delete({
+    where: {
+      id: cartId,
     },
   });
 };

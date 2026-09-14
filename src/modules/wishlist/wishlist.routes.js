@@ -8,7 +8,7 @@ import {
 import * as wishlistController from "./wishlist.controller.js";
 import {
   addToWishlistSchema,
-  variantIdSchema,
+  productIdSchema,
   batchCheckWishlistSchema,
   getWishlistQuerySchema,
 } from "./wishlist.validation.js";
@@ -38,14 +38,14 @@ wishlistRouter.post(
 wishlistRouter.delete("/clear", wishlistController.clearWishlist);
 
 wishlistRouter.get(
-  "/:variantId/check",
-  validateParams(variantIdSchema),
+  "/:productId/check",
+  validateParams(productIdSchema),
   wishlistController.checkInWishlist,
 );
 
 wishlistRouter.delete(
-  "/:variantId",
-  validateParams(variantIdSchema),
+  "/:productId",
+  validateParams(productIdSchema),
   wishlistController.removeFromWishlist,
 );
 
