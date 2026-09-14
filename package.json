@@ -4,9 +4,9 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "db:seed": "node seed/seed.js"
+    "prisma:generate": "prisma generate",
+    "start": "npm run prisma:generate && node src/server.js",
+    "dev": "npm run prisma:generate && nodemon src/server.js"
   },
   "keywords": [],
   "author": "",
