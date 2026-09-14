@@ -330,3 +330,43 @@ export const getRelatedProducts = async (productId, limit = 6, tx = prisma) => {
     take: limit,
   });
 };
+
+// ============================================================================
+// VARIANT LOOKUPS
+// ============================================================================
+// Lightweight variant -> productId resolution. Used by callers (e.g. the
+// wishlist service) that only ever receive a variantId from the client and
+// need the owning product's id, without pulling the full
+// productDetailInclude graph.
+
+export const findVariantById = (id, tx = prisma) =>
+  tx.productVariant.findUnique({
+    where: { id },
+    select: { id: true, productId: true, isActive: true },
+  });
+
+export const findVariantsByIds = (ids, tx = prisma) =>
+  tx.productVariant.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, productId: true },
+  });
+
+// ============================================================================
+// PRODUCT REFERENCE LOOKUPS (lightweight)
+// ============================================================================
+// Cheap existence/status checks against the Product table directly, for
+// callers that may receive either a variantId or a productId (e.g.
+// products with no variants have nothing for the client to select, so it
+// sends the product id itself) and don't need the full include graph.
+
+export const findProductRefById = (id, tx = prisma) =>
+  tx.product.findUnique({
+    where: { id },
+    select: { id: true, status: true },
+  });
+
+export const findProductsByIds = (ids, tx = prisma) =>
+  tx.product.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, status: true },
+  });
