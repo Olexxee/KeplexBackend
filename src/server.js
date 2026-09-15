@@ -9,6 +9,7 @@ const startServer = async () => {
     // 1. Establish database connection first
     await prisma.$connect();
     console.log("Database connected");
+    console.log("KEPLEX BUILD CHECK: product-scoped wishlist");
     app.listen(env.port, () => {
       console.log(`Server running on port ${env.port}`);
     });

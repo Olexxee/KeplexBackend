@@ -19,7 +19,7 @@ export const createAddressSchema = Joi.object({
 });
 
 export const updateAddressSchema = Joi.object({
-  label: Joi.string().trim().max(50),
+  label: Joi.string().trim().max(50).allow("", null),
 
   fullName: Joi.string().trim().min(2).max(100),
 
@@ -29,7 +29,7 @@ export const updateAddressSchema = Joi.object({
 
   city: Joi.string().trim().min(2).max(100),
 
-  state: Joi.string().trim().max(100),
+  state: Joi.string().trim().max(100).allow("", null),
 
   country: Joi.string().trim().max(100),
 

@@ -1,4 +1,3 @@
-// modules/wishlist/wishlist.controller.js
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
 import * as wishlistService from "./wishlist.service.js";
@@ -26,7 +25,7 @@ export const addToWishlist = asyncWrapper(async (req, res) => {
 });
 
 export const removeFromWishlist = asyncWrapper(async (req, res) => {
-  await wishlistService.removeFromWishlist(req.user.id, req.params.variantId);
+  await wishlistService.removeFromWishlist(req.user.id, req.params.productId);
 
   return successResponse({
     res,
@@ -48,7 +47,7 @@ export const clearWishlist = asyncWrapper(async (req, res) => {
 export const checkInWishlist = asyncWrapper(async (req, res) => {
   const inWishlist = await wishlistService.checkInWishlist(
     req.user.id,
-    req.params.variantId,
+    req.params.productId,
   );
 
   return successResponse({
@@ -59,10 +58,10 @@ export const checkInWishlist = asyncWrapper(async (req, res) => {
 });
 
 export const batchCheckWishlist = asyncWrapper(async (req, res) => {
-  const { variantIds } = req.body;
+  const { productIds } = req.body;
   const results = await wishlistService.batchCheckWishlist(
     req.user.id,
-    variantIds,
+    productIds,
   );
 
   return successResponse({

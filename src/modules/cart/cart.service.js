@@ -8,23 +8,23 @@ const toNumber = (value) => Number(value);
 const formatCart = (cart) => {
   const items = cart.items || [];
 
-  // Calculate subtotal and totals
   const subtotal = items.reduce((sum, cartItem) => {
     return sum + toNumber(cartItem.unitPriceSnapshot) * cartItem.quantity;
   }, 0);
 
-  // Calculate total weight
   const totalWeight = items.reduce((sum, cartItem) => {
     const weight = cartItem.variant?.weight || 0;
+
     return sum + toNumber(weight) * cartItem.quantity;
   }, 0);
 
-  // Calculate total CBM
   let totalCBM = 0;
+
   const cbmItems = [];
 
   for (const cartItem of items) {
     const variant = cartItem.variant;
+
     if (variant?.length && variant?.width && variant?.height) {
       const cbm =
         CBMCalculator.calculateCBM({
@@ -39,7 +39,7 @@ const formatCart = (cart) => {
         variantId: variant.id,
         sku: variant.sku,
         productName: variant.product?.name || "Unknown",
-        cbm: parseFloat(cbm.toFixed(4)),
+        cbm: Number(cbm.toFixed(4)),
         quantity: cartItem.quantity,
       });
     }
@@ -49,38 +49,54 @@ const formatCart = (cart) => {
     id: cart.id,
     status: cart.status,
     userId: cart.userId,
+
     items: items.map((cartItem) => {
-      const { variant } = cartItem;
+      const variant = cartItem.variant;
+
       const currentPrice = toNumber(cartItem.unitPriceSnapshot);
+
       const stock = variant?.stock || 0;
 
       return {
         id: cartItem.id,
         variantId: cartItem.variantId,
         quantity: cartItem.quantity,
+
         unitPrice: currentPrice,
         lineTotal: currentPrice * cartItem.quantity,
+
         variant: variant
           ? {
               id: variant.id,
               sku: variant.sku,
               color: variant.color,
               size: variant.size,
+
               price: Number(variant.price),
               weight: Number(variant.weight),
+
               stock: variant.stock,
               isActive: variant.isActive,
+
               fulfillmentType: variant.fulfillmentType,
               shippingType: variant.shippingType,
-              // CBM dimensions
+
               length: variant.length ? Number(variant.length) : null,
+
               width: variant.width ? Number(variant.width) : null,
+
               height: variant.height ? Number(variant.height) : null,
+
               cbm: variant.cbm ? Number(variant.cbm) : null,
+
               actualWeight: variant.actualWeight
                 ? Number(variant.actualWeight)
                 : null,
-              images: variant.images || [],
+
+              // Prisma relation is `media`.
+              // Frontend contract is `images`.
+              images: variant.media || [],
+
               product: variant.product
                 ? {
                     id: variant.product.id,
@@ -92,16 +108,23 @@ const formatCart = (cart) => {
                 : null,
             }
           : null,
+
         availableStock: stock,
         inStock: stock >= cartItem.quantity,
         unavailable: !variant || !variant.isActive,
       };
     }),
+
     subtotal,
-    totalWeight: parseFloat(totalWeight.toFixed(2)),
-    totalCBM: parseFloat(totalCBM.toFixed(4)),
+
+    totalWeight: Number(totalWeight.toFixed(2)),
+
+    totalCBM: Number(totalCBM.toFixed(4)),
+
     cbmItems,
+
     totalItems: items.reduce((sum, cartItem) => sum + cartItem.quantity, 0),
+
     createdAt: cart.createdAt,
     updatedAt: cart.updatedAt,
   };
@@ -109,9 +132,13 @@ const formatCart = (cart) => {
 
 const getOrCreateActiveCart = async (userId) => {
   const existingCart = await cartDb.findActiveCartByUserId(userId);
-  if (existingCart) return existingCart;
+
+  if (existingCart) {
+    return existingCart;
+  }
 
   await cartDb.createCart(userId);
+
   return cartDb.findActiveCartByUserId(userId);
 };
 
@@ -137,19 +164,20 @@ const ensureVariantCanBeAdded = async ({ variantId, quantity }) => {
 
 export const getCart = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
+
   return formatCart(cart);
 };
 
 export const addItemToCart = async (userId, payload) => {
   const { variantId, quantity = 1 } = payload;
 
-  // Validate variant and stock
-  const variant = await ensureVariantCanBeAdded({ variantId, quantity });
+  const variant = await ensureVariantCanBeAdded({
+    variantId,
+    quantity,
+  });
 
-  // Get or create active cart
   const cart = await getOrCreateActiveCart(userId);
 
-  // Check if variant already in cart
   const existingCartItem = await cartDb.findCartItem({
     cartId: cart.id,
     variantId,
@@ -157,7 +185,11 @@ export const addItemToCart = async (userId, payload) => {
 
   if (existingCartItem) {
     const nextQuantity = existingCartItem.quantity + quantity;
-    await ensureVariantCanBeAdded({ variantId, quantity: nextQuantity });
+
+    await ensureVariantCanBeAdded({
+      variantId,
+      quantity: nextQuantity,
+    });
 
     await cartDb.updateCartItemQuantity({
       cartId: cart.id,
@@ -174,6 +206,7 @@ export const addItemToCart = async (userId, payload) => {
   }
 
   const updatedCart = await cartDb.findActiveCartByUserId(userId);
+
   return formatCart(updatedCart);
 };
 
@@ -184,7 +217,10 @@ export const updateCartItem = async (userId, variantId, payload) => {
     throw new BadRequestError("Quantity must be greater than 0");
   }
 
-  await ensureVariantCanBeAdded({ variantId, quantity });
+  await ensureVariantCanBeAdded({
+    variantId,
+    quantity,
+  });
 
   const cart = await getOrCreateActiveCart(userId);
 
@@ -204,6 +240,7 @@ export const updateCartItem = async (userId, variantId, payload) => {
   });
 
   const updatedCart = await cartDb.findActiveCartByUserId(userId);
+
   return formatCart(updatedCart);
 };
 
@@ -225,41 +262,35 @@ export const removeCartItem = async (userId, variantId) => {
   });
 
   const updatedCart = await cartDb.findActiveCartByUserId(userId);
+
   return formatCart(updatedCart);
 };
 
 export const clearCart = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
+
   await cartDb.clearCartItems(cart.id);
 
   const updatedCart = await cartDb.findActiveCartByUserId(userId);
+
   return formatCart(updatedCart);
 };
 
 export const getCartSummary = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
+
   const formatted = formatCart(cart);
 
-  // Calculate shipping estimate (will be used in checkout)
   return {
     ...formatted,
-    shippingEstimate: null, // Will be calculated by shipping service
-    taxEstimate: 0, // Will be calculated by tax service
-    grandTotal: formatted.subtotal, // Will include shipping and tax
+    shippingEstimate: null,
+    taxEstimate: 0,
+    grandTotal: formatted.subtotal,
   };
 };
 
 export const mergeCarts = async (userId, sessionId) => {
-  // Merge guest cart with user cart
-  const guestCart = await prisma.cart.findFirst({
-    where: {
-      sessionId,
-      status: "ACTIVE",
-    },
-    include: {
-      items: true,
-    },
-  });
+  const guestCart = await cartDb.findActiveCartBySessionId(sessionId);
 
   if (!guestCart) {
     return getCart(userId);
@@ -267,35 +298,14 @@ export const mergeCarts = async (userId, sessionId) => {
 
   const userCart = await getOrCreateActiveCart(userId);
 
-  // Move guest cart items to user cart
-  for (const guestItem of guestCart.items) {
-    const existingItem = await cartDb.findCartItem({
-      cartId: userCart.id,
-      variantId: guestItem.variantId,
-    });
-
-    if (existingItem) {
-      await cartDb.updateCartItemQuantity({
-        cartId: userCart.id,
-        variantId: guestItem.variantId,
-        quantity: existingItem.quantity + guestItem.quantity,
-      });
-    } else {
-      await cartDb.createCartItem({
-        cartId: userCart.id,
-        variantId: guestItem.variantId,
-        quantity: guestItem.quantity,
-        unitPriceSnapshot: guestItem.unitPriceSnapshot,
-      });
-    }
-  }
-
-  // Delete guest cart
-  await prisma.cart.delete({
-    where: { id: guestCart.id },
+  await cartDb.mergeGuestCartIntoUserCart({
+    guestCartId: guestCart.id,
+    userCartId: userCart.id,
+    items: guestCart.items,
   });
 
   const updatedCart = await cartDb.findActiveCartByUserId(userId);
+
   return formatCart(updatedCart);
 };
 
@@ -317,6 +327,7 @@ export const validateCartForCheckout = async (userId) => {
         variantId: cartItem.variantId,
         error: "Variant is no longer available",
       });
+
       continue;
     }
 

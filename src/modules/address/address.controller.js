@@ -24,7 +24,10 @@ export const create = asyncWrapper(async (req, res) => {
 export const update = asyncWrapper(async (req, res) => {
   const data = await service.update(req.user.id, req.params.id, req.body);
 
-  return successResponse({ res, data });
+  return successResponse({
+    res,
+    data,
+  });
 });
 
 export const remove = asyncWrapper(async (req, res) => {
@@ -32,21 +35,12 @@ export const remove = asyncWrapper(async (req, res) => {
 
   return successResponse({
     res,
-    message: "Deleted",
+    message: "Address deleted successfully",
   });
 });
 
 export const setDefault = asyncWrapper(async (req, res) => {
   const data = await service.setDefault(req.user.id, req.params.id);
-
-  return successResponse({
-    res,
-    data,
-  });
-});
-
-export const updateMe = asyncWrapper(async (req, res) => {
-  const data = await authService.updateMe(req.user.id, req.body);
 
   return successResponse({
     res,

@@ -1,4 +1,3 @@
-// modules/cart/cart.controller.js
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
 import * as cartService from "./cart.service.js";

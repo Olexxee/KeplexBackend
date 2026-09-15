@@ -8,7 +8,7 @@ import {
   buildPaginationMeta,
 } from "../../lib/pagination.js";
 import * as wishlistDb from "./wishlist.db.js";
-import * as variantDb from "../variants/variant.db.js";
+import * as productDb from "../products/product.db.js";
 
 export const getWishlist = async (userId, filters) => {
   const { page = 1, limit = 20 } = filters;
@@ -29,58 +29,110 @@ export const getWishlist = async (userId, filters) => {
   };
 };
 
+// The client sends different kinds of ids depending on whether the
+// product has variants: products with variants send the *variant's* id
+// (that's what's selectable), products with no variants have nothing to
+// select so they send the *product's* id directly. Wishlist storage is
+// product-scoped either way (see wishlist.db.js / the userId_productId
+// unique constraint), so every mutation/check resolves the incoming id
+// to a product here, trying the variant table first, then falling back
+// to treating it as a product id.
+const resolveProduct = async (id) => {
+  if (!id) {
+    throw new BadRequestError("productId is required");
+  }
+
+  const variant = await productDb.findVariantById(id);
+  if (variant) {
+    const product = await productDb.findProductRefById(variant.productId);
+    if (!product) {
+      throw new NotFoundError("Product not found");
+    }
+    return product;
+  }
+
+  const product = await productDb.findProductRefById(id);
+  if (product) {
+    return product;
+  }
+
+  throw new NotFoundError("Product not found");
+};
+
 export const addToWishlist = async (userId, payload) => {
-  const { variantId } = payload;
+  // NOTE: payload.productId may actually be a variant id — see
+  // resolveProduct above.
+  const { productId: id } = payload;
 
-  // Check if variant exists and is active
-  const variant = await variantDb.findVariantById(variantId);
-  if (!variant) {
-    throw new NotFoundError("Variant not found");
+  const product = await resolveProduct(id);
+
+  if (product.status !== "ACTIVE") {
+    throw new BadRequestError("Product is not available");
   }
 
-  if (!variant.isActive) {
-    throw new BadRequestError("Variant is not available");
-  }
-
-  // Check if already in wishlist
-  const existing = await wishlistDb.findWishlistItem(userId, variantId);
+  const existing = await wishlistDb.findWishlistItem(userId, product.id);
   if (existing) {
     throw new ConflictError("Item already in wishlist");
   }
 
-  return wishlistDb.addToWishlist(userId, variantId);
+  return wishlistDb.addToWishlist(userId, product.id);
 };
 
-export const removeFromWishlist = async (userId, variantId) => {
-  const item = await wishlistDb.findWishlistItem(userId, variantId);
+export const removeFromWishlist = async (userId, id) => {
+  const product = await resolveProduct(id);
+
+  const item = await wishlistDb.findWishlistItem(userId, product.id);
   if (!item) {
     throw new NotFoundError("Item not found in wishlist");
   }
 
-  return wishlistDb.removeFromWishlist(userId, variantId);
+  return wishlistDb.removeFromWishlist(userId, product.id);
 };
 
 export const clearWishlist = async (userId) => {
   return wishlistDb.clearWishlist(userId);
 };
 
-export const checkInWishlist = async (userId, variantId) => {
-  return wishlistDb.isInWishlist(userId, variantId);
+export const checkInWishlist = async (userId, id) => {
+  // A bad/unresolvable id just means "not wishlisted" for status checks —
+  // no need to error the UI over it.
+  try {
+    const product = await resolveProduct(id);
+    return wishlistDb.isInWishlist(userId, product.id);
+  } catch (err) {
+    if (err instanceof NotFoundError || err instanceof BadRequestError) {
+      return false;
+    }
+    throw err;
+  }
 };
 
-export const getWishlistVariantIds = async (userId) => {
-  return wishlistDb.getWishlistVariantIds(userId);
+export const getWishlistProductIds = async (userId) => {
+  return wishlistDb.getWishlistProductIds(userId);
 };
 
-export const batchCheckWishlist = async (userId, variantIds) => {
-  if (!userId || !variantIds || variantIds.length === 0) {
+export const batchCheckWishlist = async (userId, ids) => {
+  if (!userId || !ids || ids.length === 0) {
     return {};
   }
 
-  const inWishlist = await wishlistDb.getWishlistVariantIds(userId);
+  const [variants, products, wishlistedProductIds] = await Promise.all([
+    productDb.findVariantsByIds(ids),
+    productDb.findProductsByIds(ids),
+    wishlistDb.getWishlistProductIds(userId),
+  ]);
+
+  const productIdByVariantId = new Map(
+    variants.map((v) => [v.id, v.productId]),
+  );
+  const productIdSet = new Set(products.map((p) => p.id));
+  const wishlistedProductIdSet = new Set(wishlistedProductIds);
+
   const result = {};
-  for (const variantId of variantIds) {
-    result[variantId] = inWishlist.includes(variantId);
+  for (const id of ids) {
+    const productId =
+      productIdByVariantId.get(id) ?? (productIdSet.has(id) ? id : null);
+    result[id] = productId ? wishlistedProductIdSet.has(productId) : false;
   }
   return result;
 };

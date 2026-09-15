@@ -1,37 +1,54 @@
 import { prisma } from "../../config/prisma.js";
 
+const variantMediaSelect = {
+  id: true,
+  url: true,
+  isPrimary: true,
+  sortOrder: true,
+};
+
+const productInclude = {
+  brand: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  category: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+};
+
+const variantInclude = {
+  media: {
+    select: variantMediaSelect,
+  },
+  product: {
+    include: productInclude,
+  },
+};
+
 const orderInclude = {
   items: {
     include: {
       variant: {
-        include: {
-          product: {
-            include: {
-              brand: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-              category: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
+        include: variantInclude,
       },
     },
   },
+
   payments: true,
+
   fulfillments: {
     include: {
       items: true,
       warehouse: true,
     },
   },
+
   user: {
     select: {
       id: true,
@@ -48,13 +65,15 @@ const orderInclude = {
 export const generateOrderNumber = () => {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+
   return `KEP-${timestamp}-${random}`;
 };
 
 /**
  * CART
  */
-export const findActiveCartForCheckout = async (userId, tx = prisma) => {
+
+export const findActiveCartForCheckout = (userId, tx = prisma) => {
   return tx.cart.findFirst({
     where: {
       userId,
@@ -65,12 +84,7 @@ export const findActiveCartForCheckout = async (userId, tx = prisma) => {
         include: {
           variant: {
             include: {
-              product: {
-                include: {
-                  brand: true,
-                  category: true,
-                },
-              },
+              product: true,
             },
           },
         },
@@ -78,6 +92,7 @@ export const findActiveCartForCheckout = async (userId, tx = prisma) => {
     },
   });
 };
+
 
 /**
  * ORDER CREATE
@@ -96,13 +111,13 @@ export const createOrderFromCart = async (
   },
   tx = prisma,
 ) => {
-  // Calculate totals from cart
   const subtotal = cart.items.reduce(
     (sum, item) => sum + Number(item.unitPriceSnapshot) * item.quantity,
     0,
   );
 
   const totalCBM = itemsWithCBM.reduce((sum, item) => sum + item.cbm, 0);
+
   const totalChargeableWeight = itemsWithCBM.reduce(
     (sum, item) => sum + item.chargeableWeight,
     0,
@@ -112,9 +127,11 @@ export const createOrderFromCart = async (
     data: {
       userId,
       orderNumber: generateOrderNumber(),
+
       customerName: address.fullName,
       customerEmail: address.email || null,
       customerPhone: address.phone,
+
       shippingLabel: address.label || null,
       shippingStreet: address.addressLine,
       shippingCity: address.city,
@@ -129,12 +146,13 @@ export const createOrderFromCart = async (
       status: "PENDING",
       notes: payload.notes || null,
 
-      // Store CBM data
       cbm: parseFloat(totalCBM.toFixed(4)),
       chargeableWeight: parseFloat(totalChargeableWeight.toFixed(2)),
+
       cbmData: {
         totalCBM: parseFloat(totalCBM.toFixed(4)),
         totalChargeableWeight: parseFloat(totalChargeableWeight.toFixed(2)),
+
         items: itemsWithCBM.map((item) => ({
           variantId: item.variantId,
           sku: item.variant?.sku,
@@ -142,6 +160,7 @@ export const createOrderFromCart = async (
           quantity: item.quantity,
           cbm: item.cbm,
           chargeableWeight: item.chargeableWeight,
+
           dimensions: {
             length: item.variant?.length,
             width: item.variant?.width,
@@ -150,7 +169,6 @@ export const createOrderFromCart = async (
         })),
       },
 
-      // Store fulfillment groupings
       fulfillmentGroups: payload.fulfillmentGroups || null,
 
       items: {
@@ -158,17 +176,21 @@ export const createOrderFromCart = async (
           const itemCBM = itemsWithCBM.find(
             (item) => item.variantId === cartItem.variantId,
           );
+
           return {
             variantId: cartItem.variantId,
             quantity: cartItem.quantity,
             unitPriceSnapshot: cartItem.unitPriceSnapshot,
+
             totalPrice: Number(cartItem.unitPriceSnapshot) * cartItem.quantity,
+
             cbm: itemCBM?.cbm || 0,
             chargeableWeight: itemCBM?.chargeableWeight || 0,
           };
         }),
       },
     },
+
     include: orderInclude,
   });
 };
@@ -188,19 +210,42 @@ export const findOrders = async ({
   const where = {
     ...(status && { status }),
     ...(userId && { userId }),
+
     ...(search && {
       OR: [
-        { orderNumber: { contains: search, mode: "insensitive" } },
-        { customerName: { contains: search, mode: "insensitive" } },
-        { customerEmail: { contains: search, mode: "insensitive" } },
-        { customerPhone: { contains: search, mode: "insensitive" } },
+        {
+          orderNumber: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          customerName: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          customerEmail: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          customerPhone: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
       ],
     }),
+
     ...(startDate && {
       createdAt: {
         gte: new Date(startDate),
       },
     }),
+
     ...(endDate && {
       createdAt: {
         lte: new Date(endDate),
@@ -211,11 +256,16 @@ export const findOrders = async ({
   return Promise.all([
     prisma.order.findMany({
       where,
+
       include: {
         items: {
           include: {
             variant: {
               include: {
+                media: {
+                  select: variantMediaSelect,
+                },
+
                 product: {
                   select: {
                     id: true,
@@ -227,6 +277,7 @@ export const findOrders = async ({
             },
           },
         },
+
         payments: {
           select: {
             id: true,
@@ -235,12 +286,14 @@ export const findOrders = async ({
             provider: true,
           },
         },
+
         fulfillments: {
           include: {
             items: true,
             warehouse: true,
           },
         },
+
         user: {
           select: {
             id: true,
@@ -250,29 +303,38 @@ export const findOrders = async ({
           },
         },
       },
+
       orderBy: {
         createdAt: "desc",
       },
+
       skip,
       take,
     }),
-    prisma.order.count({ where }),
+
+    prisma.order.count({
+      where,
+    }),
   ]);
 };
 
 /**
  * SINGLE ORDER
  */
-export const findOrderById = async (id) => {
-  return prisma.order.findUnique({
-    where: { id },
+export const findOrderById = async (id, tx = prisma) => {
+  return tx.order.findUnique({
+    where: {
+      id,
+    },
     include: orderInclude,
   });
 };
 
 export const findOrderByOrderNumber = async (orderNumber) => {
   return prisma.order.findUnique({
-    where: { orderNumber },
+    where: {
+      orderNumber,
+    },
     include: orderInclude,
   });
 };
@@ -282,8 +344,14 @@ export const findOrderByOrderNumber = async (orderNumber) => {
  */
 export const updateOrderStatus = async (id, status) => {
   return prisma.order.update({
-    where: { id },
-    data: { status },
+    where: {
+      id,
+    },
+
+    data: {
+      status,
+    },
+
     include: orderInclude,
   });
 };
@@ -302,6 +370,7 @@ export const decrementVariantStock = async (
         gte: quantity,
       },
     },
+
     data: {
       stock: {
         decrement: quantity,
@@ -315,7 +384,10 @@ export const restoreOrderItemStock = async (
   tx = prisma,
 ) => {
   return tx.productVariant.update({
-    where: { id: variantId },
+    where: {
+      id: variantId,
+    },
+
     data: {
       stock: {
         increment: quantity,
@@ -329,8 +401,12 @@ export const restoreOrderItemStock = async (
  */
 export const updateOrderStatusTx = async (id, data, tx = prisma) => {
   return tx.order.update({
-    where: { id },
+    where: {
+      id,
+    },
+
     data,
+
     include: orderInclude,
   });
 };
@@ -338,16 +414,20 @@ export const updateOrderStatusTx = async (id, data, tx = prisma) => {
 /**
  * ORDER CBM UPDATE
  */
-export const updateOrderCBM = async (id, cbmData, tx = prisma) => {
+export const updateOrderCBM = async (id, data, tx = prisma) => {
   return tx.order.update({
-    where: { id },
-    data: {
-      cbm: cbmData.totalCBM,
-      chargeableWeight: cbmData.totalChargeableWeight,
-      cbmData: cbmData,
-      cbmUpdatedAt: new Date(),
-      cbmUpdatedBy: cbmData.updatedBy,
+    where: {
+      id,
     },
+
+    data: {
+      cbm: data.cbm,
+      chargeableWeight: data.chargeableWeight,
+      cbmData: data.cbmData,
+      cbmUpdatedAt: data.cbmUpdatedAt || new Date(),
+      cbmUpdatedBy: data.cbmUpdatedBy,
+    },
+
     include: orderInclude,
   });
 };
@@ -367,14 +447,41 @@ export const getOrderMetrics = async () => {
     todayRevenue,
   ] = await Promise.all([
     prisma.order.count(),
-    prisma.order.count({ where: { status: "PENDING" } }),
-    prisma.order.count({ where: { status: "PROCESSING" } }),
-    prisma.order.count({ where: { status: "COMPLETED" } }),
-    prisma.order.count({ where: { status: "CANCELLED" } }),
-    prisma.order.aggregate({
-      where: { status: "COMPLETED" },
-      _sum: { totalAmount: true },
+
+    prisma.order.count({
+      where: {
+        status: "PENDING",
+      },
     }),
+
+    prisma.order.count({
+      where: {
+        status: "PROCESSING",
+      },
+    }),
+
+    prisma.order.count({
+      where: {
+        status: "COMPLETED",
+      },
+    }),
+
+    prisma.order.count({
+      where: {
+        status: "CANCELLED",
+      },
+    }),
+
+    prisma.order.aggregate({
+      where: {
+        status: "COMPLETED",
+      },
+
+      _sum: {
+        totalAmount: true,
+      },
+    }),
+
     prisma.order.count({
       where: {
         createdAt: {
@@ -382,14 +489,19 @@ export const getOrderMetrics = async () => {
         },
       },
     }),
+
     prisma.order.aggregate({
       where: {
         status: "COMPLETED",
+
         createdAt: {
           gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
       },
-      _sum: { totalAmount: true },
+
+      _sum: {
+        totalAmount: true,
+      },
     }),
   ]);
 
@@ -399,8 +511,11 @@ export const getOrderMetrics = async () => {
     processingOrders,
     completedOrders,
     cancelledOrders,
+
     totalRevenue: totalRevenue._sum.totalAmount || 0,
+
     todayOrders,
+
     todayRevenue: todayRevenue._sum.totalAmount || 0,
   };
 };
@@ -415,7 +530,10 @@ export const findOrderAuditLogs = async (orderId) => {
       entityId: orderId,
       action: "ORDER_STATUS_CHANGE",
     },
-    orderBy: { createdAt: "asc" },
+
+    orderBy: {
+      createdAt: "asc",
+    },
   });
 };
 
@@ -424,8 +542,13 @@ export const findOrderAuditLogs = async (orderId) => {
  */
 export const findOrderPayments = async (orderId) => {
   return prisma.payment.findMany({
-    where: { orderId },
-    orderBy: { createdAt: "asc" },
+    where: {
+      orderId,
+    },
+
+    orderBy: {
+      createdAt: "asc",
+    },
   });
 };
 
@@ -434,9 +557,17 @@ export const findOrderPayments = async (orderId) => {
  */
 export const findOrderFulfillments = async (orderId) => {
   return prisma.fulfillment.findMany({
-    where: { orderId },
-    include: { items: true },
-    orderBy: { createdAt: "asc" },
+    where: {
+      orderId,
+    },
+
+    include: {
+      items: true,
+    },
+
+    orderBy: {
+      createdAt: "asc",
+    },
   });
 };
 
@@ -451,16 +582,22 @@ export const findOrdersByFulfillmentType = async (fulfillmentType) => {
         array_contains: fulfillmentType,
       },
     },
+
     include: {
       items: {
         include: {
           variant: {
             include: {
+              media: {
+                select: variantMediaSelect,
+              },
+
               product: true,
             },
           },
         },
       },
+
       fulfillments: {
         where: {
           type: fulfillmentType,

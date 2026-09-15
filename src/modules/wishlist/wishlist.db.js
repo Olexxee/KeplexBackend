@@ -1,35 +1,47 @@
 import { prisma } from "../../config/prisma.js";
 
+// Product itself has no media of its own (images live on
+// ProductVariant/VariantMedia), so we pull one representative active
+// variant + its primary image along with the product, purely for
+// rendering a wishlist card (thumbnail + a display price). This is not
+// "the variant the user wishlisted" — there isn't one anymore; it's just
+// a stand-in for display purposes.
 const wishlistInclude = {
-  variant: {
+  product: {
     include: {
-      product: {
-        include: {
-          brand: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
-          },
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
-          },
+      brand: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
         },
       },
-      media: {
-        where: { isPrimary: true },
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+      variants: {
+        where: { isActive: true },
+        orderBy: { createdAt: "asc" },
         take: 1,
+        include: {
+          media: {
+            where: { isPrimary: true },
+            take: 1,
+          },
+        },
       },
     },
   },
 };
 
-export const findWishlistByUser = async (userId, { skip = 0, take = 20 } = {}) => {
+export const findWishlistByUser = async (
+  userId,
+  { skip = 0, take = 20 } = {},
+) => {
   const where = { userId };
 
   const [items, total] = await Promise.all([
@@ -46,34 +58,34 @@ export const findWishlistByUser = async (userId, { skip = 0, take = 20 } = {}) =
   return { items, total };
 };
 
-export const findWishlistItem = async (userId, variantId) => {
+export const findWishlistItem = async (userId, productId) => {
   return prisma.wishlist.findUnique({
     where: {
-      userId_variantId: {
+      userId_productId: {
         userId,
-        variantId,
+        productId,
       },
     },
     include: wishlistInclude,
   });
 };
 
-export const addToWishlist = async (userId, variantId) => {
+export const addToWishlist = async (userId, productId) => {
   return prisma.wishlist.create({
     data: {
       userId,
-      variantId,
+      productId,
     },
     include: wishlistInclude,
   });
 };
 
-export const removeFromWishlist = async (userId, variantId) => {
+export const removeFromWishlist = async (userId, productId) => {
   return prisma.wishlist.delete({
     where: {
-      userId_variantId: {
+      userId_productId: {
         userId,
-        variantId,
+        productId,
       },
     },
   });
@@ -85,12 +97,12 @@ export const clearWishlist = async (userId) => {
   });
 };
 
-export const isInWishlist = async (userId, variantId) => {
+export const isInWishlist = async (userId, productId) => {
   const item = await prisma.wishlist.findUnique({
     where: {
-      userId_variantId: {
+      userId_productId: {
         userId,
-        variantId,
+        productId,
       },
     },
     select: { id: true },
@@ -98,10 +110,10 @@ export const isInWishlist = async (userId, variantId) => {
   return !!item;
 };
 
-export const getWishlistVariantIds = async (userId) => {
+export const getWishlistProductIds = async (userId) => {
   const items = await prisma.wishlist.findMany({
     where: { userId },
-    select: { variantId: true },
+    select: { productId: true },
   });
-  return items.map((item) => item.variantId);
+  return items.map((item) => item.productId);
 };

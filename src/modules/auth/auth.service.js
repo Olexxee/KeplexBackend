@@ -156,5 +156,5 @@ export const getMe = async (userId) => {
     throw new UnauthorizedError("User not found");
   }
 
-  return user;
+  return sanitizeUser(user);
 };

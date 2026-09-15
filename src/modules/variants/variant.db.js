@@ -17,7 +17,7 @@ const variantInclude = {
   },
   cartItems: true,
   orderItems: true,
-  wishlists: true,
+  // wishlists: true,
   reviews: true,
 };
 
