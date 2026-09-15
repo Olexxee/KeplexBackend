@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/server.js",
-"scripts": {
-  "prisma:generate": "prisma generate",
-  "prisma:migrate:deploy": "prisma migrate deploy",
-  "start": "node src/server.js",
-  "dev": "npm run prisma:generate && nodemon src/server.js"
-},
-
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:deploy": "npm run prisma:generate && npm run prisma:migrate:deploy",
+    "start": "node src/server.js",
+    "dev": "npm run prisma:generate && nodemon src/server.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
