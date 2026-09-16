@@ -3,12 +3,17 @@ import * as paymentDb from "./payment.db.js";
 import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
 import * as registrationDb from "../registration/registration.db.js";
 import { prisma } from "../../config/prisma.js";
+import { orderQueue } from "../../jobs/queues/order.queue.js";
 
-// ─────────────────────────────────────────
+// ============================================================
 // ORDER PAYMENT
-// ─────────────────────────────────────────
+// ============================================================
 
 export const initializePayment = async ({ order, user }) => {
+  if (!order) {
+    throw new NotFoundError("Order not found");
+  }
+
   const isOwner = order.userId === user.id;
   const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
 
@@ -20,16 +25,19 @@ export const initializePayment = async ({ order, user }) => {
     throw new BadRequestError("Only pending orders can be paid for");
   }
 
-  const existing = order.payments?.find((p) => p.status === "PENDING");
-  if (existing?.authorizationUrl) return existing;
+  const existing = order.payments?.find(
+    (payment) => payment.status === "PENDING" && payment.authorizationUrl,
+  );
+
+  if (existing) {
+    return existing;
+  }
 
   const email = order.user?.email;
 
   if (!email) {
     throw new BadRequestError("Customer email not found");
   }
-  
-  if (!email) throw new BadRequestError("Missing customer email");
 
   const reference = paystack.generateReference("KPX-ORDER");
 
@@ -58,9 +66,9 @@ export const initializePayment = async ({ order, user }) => {
   });
 };
 
-// ─────────────────────────────────────────
+// ============================================================
 // REGISTRATION PAYMENT
-// ─────────────────────────────────────────
+// ============================================================
 
 export const initializeRegistrationPayment = async ({ registrationId }) => {
   const registration =
@@ -74,9 +82,13 @@ export const initializeRegistrationPayment = async ({ registrationId }) => {
     throw new BadRequestError("Registration already paid");
   }
 
-  // price lives on the training program, not the enrollment
   const amount = registration.trainingProgram.price;
   const email = registration.email;
+
+  if (!email) {
+    throw new BadRequestError("Registration customer email not found");
+  }
+
   const reference = paystack.generateReference("KPX-REG");
 
   const init = await paystack.initializeTransaction({
@@ -90,8 +102,8 @@ export const initializeRegistrationPayment = async ({ registrationId }) => {
     },
   });
 
-  // create a unified Payment row so verify logic stays in one place
   await paymentDb.createPayment({
+    trainingEnrollmentId: registration.id,
     paymentType: "TRAINING_REGISTRATION",
     provider: "PAYSTACK",
     reference,
@@ -101,14 +113,8 @@ export const initializeRegistrationPayment = async ({ registrationId }) => {
     authorizationUrl: init.authorization_url,
     accessCode: init.access_code,
     providerPayload: init.raw,
-    metadata: {
-      type: "TRAINING_REGISTRATION",
-      registrationId: registration.id,
-      trainingProgramId: registration.trainingProgramId,
-    },
   });
 
-  // also stamp the reference on the enrollment for easy lookup
   await registrationDb.updateRegistrationById(registration.id, {
     paymentRef: reference,
     authorizationUrl: init.authorization_url,
@@ -122,92 +128,87 @@ export const initializeRegistrationPayment = async ({ registrationId }) => {
   };
 };
 
-// ─────────────────────────────────────────
-// UNIFIED VERIFY — works for all payment types
-// ─────────────────────────────────────────
+// ============================================================
+// VERIFY PAYMENT
+// ============================================================
 
 export const verifyPayment = async (reference) => {
   const payment = await paymentDb.findPaymentByReference(reference);
 
-  if (!payment) throw new NotFoundError("Payment not found");
+  if (!payment) {
+    throw new NotFoundError("Payment not found");
+  }
 
-  // already settled — return early, don't re-verify
   if (["SUCCESS", "FAILED", "REVERSED"].includes(payment.status)) {
     return payment;
   }
 
   const verification = await paystack.verifyTransaction(reference);
 
-  const updated = await paymentDb.updatePaymentByReference(reference, {
-    status: verification.status,
-    providerPayload: verification.raw,
-  });
+  const status = verification.status;
 
-  if (verification.status !== "SUCCESS") return updated;
+  const result = await prisma.$transaction(async (tx) => {
+    const currentPayment = await tx.payment.findUnique({
+      where: { reference },
+      include: {
+        order: true,
+      },
+    });
 
-  // post-success side effects per payment type
-  const type = payment.metadata?.type ?? payment.paymentType;
-
-  if (type === "ORDER_PAYMENT" && updated.order?.status === "PENDING") {
-    await paymentDb.markOrderConfirmed(updated.orderId);
-  }
-
-  if (type === "TRAINING_REGISTRATION") {
-    const registrationId = payment.metadata?.registrationId;
-    if (registrationId) {
-      await registrationDb.updateRegistrationById(registrationId, {
-        status: "PAID",
-        paidAt: new Date(),
-      });
+    if (!currentPayment) {
+      throw new NotFoundError("Payment not found");
     }
-  }
 
-  return updated;
-};
+    if (["SUCCESS", "FAILED", "REVERSED"].includes(currentPayment.status)) {
+      return {
+        payment: currentPayment,
+        orderConfirmed: false,
+      };
+    }
 
-// ─────────────────────────────────────────
-// WEBHOOK — idempotent, handles all types
-// ─────────────────────────────────────────
-
-export const handleWebhook = async (event) => {
-  if (event?.event !== "charge.success") return;
-
-  const reference = event.data?.reference;
-  if (!reference) return;
-
-  const payment = await paymentDb.findPaymentByReference(reference);
-
-  // unknown reference or already processed
-  if (!payment) return;
-  if (payment.status === "SUCCESS") return;
-
-  const status = paystack.mapStatus(event.data.status);
-  const type = payment.metadata?.type ?? payment.paymentType;
-
-  await prisma.$transaction(async (tx) => {
-    const updated = await tx.payment.update({
+    const updatedPayment = await tx.payment.update({
       where: { reference },
       data: {
         status,
-        providerPayload: event,
+        providerPayload: verification.raw,
       },
-      include: { order: true },
+      include: {
+        order: true,
+      },
     });
 
-    if (status !== "SUCCESS") return;
-
-    if (type === "ORDER_PAYMENT" && updated.order?.status === "PENDING") {
-      await tx.order.update({
-        where: { id: updated.orderId },
-        data: { status: "CONFIRMED" },
-      });
+    if (status !== "SUCCESS") {
+      return {
+        payment: updatedPayment,
+        orderConfirmed: false,
+      };
     }
 
-    if (type === "TRAINING_REGISTRATION") {
-      const registrationId = payment.metadata?.registrationId;
-      if (registrationId) {
+    if (
+      currentPayment.paymentType === "ORDER_PAYMENT" &&
+      updatedPayment.order?.status === "PENDING"
+    ) {
+      await tx.order.update({
+        where: {
+          id: updatedPayment.orderId,
+        },
+        data: {
+          status: "CONFIRMED",
+        },
+      });
+
+      return {
+        payment: updatedPayment,
+        orderConfirmed: true,
+      };
+    }
+
+    if (currentPayment.paymentType === "TRAINING_REGISTRATION") {
+      if (currentPayment.trainingEnrollmentId) {
         await tx.trainingEnrollment.update({
-          where: { id: registrationId },
+          where: {
+            id: currentPayment.trainingEnrollmentId,
+          },
           data: {
             status: "PAID",
             paidAt: new Date(),
@@ -215,5 +216,224 @@ export const handleWebhook = async (event) => {
         });
       }
     }
+
+    return {
+      payment: updatedPayment,
+      orderConfirmed: false,
+    };
   });
+
+  if (result.orderConfirmed) {
+    await queueOrderPaymentConfirmed({
+      payment: result.payment,
+    });
+  }
+
+  return result.payment;
+};
+
+// ============================================================
+// PAYSTACK WEBHOOK
+// ============================================================
+
+export const handleWebhook = async (event) => {
+  if (!event?.event) {
+    return;
+  }
+
+  /*
+   * We only process charge.success here.
+   *
+   * Other Paystack events can be added later without
+   * changing the webhook controller.
+   */
+  if (event.event !== "charge.success") {
+    return;
+  }
+
+  const reference = event.data?.reference;
+
+  if (!reference) {
+    return;
+  }
+
+  const payment = await paymentDb.findPaymentByReference(reference);
+
+  if (!payment) {
+    console.warn(`[PAYSTACK WEBHOOK] Unknown payment reference: ${reference}`);
+
+    return;
+  }
+
+  /*
+   * Fast idempotency check.
+   *
+   * The transaction below performs the authoritative
+   * database check again because two identical webhooks
+   * can theoretically arrive at the same time.
+   */
+  if (payment.status === "SUCCESS") {
+    return;
+  }
+
+  const status = paystack.mapStatus(event.data?.status);
+
+  const result = await prisma.$transaction(async (tx) => {
+    const currentPayment = await tx.payment.findUnique({
+      where: {
+        reference,
+      },
+      include: {
+        order: true,
+      },
+    });
+
+    if (!currentPayment) {
+      return {
+        payment: null,
+        orderConfirmed: false,
+      };
+    }
+
+    /*
+     * Authoritative idempotency check.
+     */
+    if (currentPayment.status === "SUCCESS") {
+      return {
+        payment: currentPayment,
+        orderConfirmed: false,
+      };
+    }
+
+    const updatedPayment = await tx.payment.update({
+      where: {
+        reference,
+      },
+      data: {
+        status,
+        providerPayload: event,
+      },
+      include: {
+        order: true,
+      },
+    });
+
+    if (status !== "SUCCESS") {
+      return {
+        payment: updatedPayment,
+        orderConfirmed: false,
+      };
+    }
+
+    /*
+     * ORDER PAYMENT
+     */
+    if (
+      currentPayment.paymentType === "ORDER_PAYMENT" &&
+      updatedPayment.order?.status === "PENDING"
+    ) {
+      await tx.order.update({
+        where: {
+          id: updatedPayment.orderId,
+        },
+        data: {
+          status: "CONFIRMED",
+        },
+      });
+
+      return {
+        payment: updatedPayment,
+        orderConfirmed: true,
+      };
+    }
+
+    /*
+     * TRAINING REGISTRATION
+     */
+    if (currentPayment.paymentType === "TRAINING_REGISTRATION") {
+      if (currentPayment.trainingEnrollmentId) {
+        await tx.trainingEnrollment.update({
+          where: {
+            id: currentPayment.trainingEnrollmentId,
+          },
+          data: {
+            status: "PAID",
+            paidAt: new Date(),
+          },
+        });
+      }
+    }
+
+    return {
+      payment: updatedPayment,
+      orderConfirmed: false,
+    };
+  });
+
+  /*
+   * IMPORTANT:
+   *
+   * This happens AFTER the payment/order transaction
+   * has committed.
+   *
+   * Fulfillment is therefore never created inside
+   * the Paystack database transaction.
+   */
+  if (result.orderConfirmed) {
+    await queueOrderPaymentConfirmed({
+      payment: result.payment,
+    });
+  }
+
+  return result.payment;
+};
+
+// ============================================================
+// ORDER PAYMENT → BACKGROUND PROCESSING
+// ============================================================
+
+const queueOrderPaymentConfirmed = async ({ payment }) => {
+  if (!payment?.orderId) {
+    return;
+  }
+
+  const jobId = `order-payment-confirmed-${payment.orderId}`;
+
+  try {
+    const job = await orderQueue.add(
+      "ORDER_PAYMENT_CONFIRMED",
+      {
+        orderId: payment.orderId,
+        paymentId: payment.id,
+        reference: payment.reference,
+        userId: payment.order?.userId ?? null,
+      },
+      {
+        jobId,
+      },
+    );
+
+    console.log("[PAYMENT] Order payment confirmation queued:", {
+      jobId: job.id,
+      orderId: payment.orderId,
+      reference: payment.reference,
+    });
+
+    return job;
+  } catch (error) {
+    /*
+     * Payment and order confirmation have already committed.
+     *
+     * Do not convert a successful payment into a failed
+     * webhook response simply because Redis is temporarily
+     * unavailable.
+     */
+    console.error("[PAYMENT] Failed to queue order payment confirmation:", {
+      orderId: payment.orderId,
+      reference: payment.reference,
+      error,
+    });
+
+    return null;
+  }
 };

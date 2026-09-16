@@ -254,3 +254,7 @@ Customer:
    Orders:       3
    Reviews:      4
    Training:     2
+
+
+//production paystack url example
+https://keplexshopping.vercel.app/payment/callback

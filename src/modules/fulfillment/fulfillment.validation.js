@@ -34,13 +34,21 @@ export const getFulfillmentsQuerySchema = Joi.object({
 });
 
 // Warehouse validation
-export const createWarehouseSchema = Joi.object({
+const createWarehouseSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
-  code: Joi.string().trim().min(2).max(20).required(),
-  address: Joi.string().trim().required(),
-  city: Joi.string().trim().required(),
-  state: Joi.string().trim().required(),
-  country: Joi.string().trim().default("NG"),
+
+  code: Joi.string().trim().min(2).max(50).required(),
+
+  type: Joi.string().valid("LOCAL", "IMPORT", "PREORDER").default("LOCAL"),
+
+  address: Joi.string().trim().allow(null, "").optional(),
+
+  city: Joi.string().trim().allow(null, "").optional(),
+
+  state: Joi.string().trim().allow(null, "").optional(),
+
+  country: Joi.string().trim().allow(null, "").optional(),
+
   isActive: Joi.boolean().default(true),
 });
 

@@ -1,273 +1,605 @@
 import { prisma } from "../../config/prisma.js";
-import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
+import {
+  NotFoundError,
+  BadRequestError,
+} from "../../classes/errorClasses.js";
 import * as checkoutService from "../checkout/checkout.service.js";
-import { assertValidTransition } from "./order.state.js";
 import * as orderDb from "./order.db.js";
+import * as auditDb from "../audit/audit.service.js";
+import { assertValidTransition } from "./order.state.js";
 import {
   getPaginationParams,
   formatPaginatedResponse,
 } from "../../lib/pagination.js";
 
-export const getMyOrders = async (userId, filters) => {
-  const { page, limit, status, search, startDate, endDate } = filters;
-  const { skip, take } = getPaginationParams(page, limit);
 
-  const [data, total] = await orderDb.findOrders({
-    userId,
+
+// ============================================================
+// ORDERS
+// ============================================================
+
+export const getMyOrders = async (
+  userId,
+  filters,
+) => {
+  const {
+    page,
+    limit,
     status,
     search,
     startDate,
     endDate,
-    skip,
-    take,
-  });
+  } = filters;
 
-  return formatPaginatedResponse({ data, total, page, limit });
-};
+  const { skip, take } =
+    getPaginationParams(
+      page,
+      limit,
+    );
 
-export const getAllOrders = async (filters) => {
-  const { page, limit, status, userId, search, startDate, endDate } = filters;
-  const { skip, take } = getPaginationParams(page, limit);
-
-  const [data, total] = await orderDb.findOrders({
-    status,
-    userId,
-    search,
-    startDate,
-    endDate,
-    skip,
-    take,
-  });
-
-  return formatPaginatedResponse({ data, total, page, limit });
-};
-
-export const getOrderById = async (id, user) => {
-  const order = await orderDb.findOrderById(id);
-
-  if (!order) {
-    throw new NotFoundError("Order not found");
-  }
-
-  const isOwner = order.userId === user.id;
-  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
-
-  if (!isOwner && !isAdmin) {
-    throw new NotFoundError("Order not found");
-  }
-
-  return order;
-};
-
-export const getOrderByOrderNumber = async (orderNumber, user) => {
-  const order = await orderDb.findOrderByOrderNumber(orderNumber);
-
-  if (!order) {
-    throw new NotFoundError("Order not found");
-  }
-
-  const isOwner = order.userId === user.id;
-  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
-
-  if (!isOwner && !isAdmin) {
-    throw new NotFoundError("Order not found");
-  }
-
-  return order;
-};
-
-export const updateOrderStatus = async (id, status, userId) => {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id },
-      include: {
-        items: {
-          include: {
-            variant: true,
-          },
-        },
-      },
+  const [data, total] =
+    await orderDb.findOrders({
+      userId,
+      status,
+      search,
+      startDate,
+      endDate,
+      skip,
+      take,
     });
 
-    if (!order) {
-      throw new NotFoundError("Order not found");
-    }
+  return formatPaginatedResponse({
+    data,
+    total,
+    page,
+    limit,
+  });
+};
 
-    // HARD IMMUTABILITY RULES
-    if (order.status === "COMPLETED") {
-      throw new BadRequestError("Completed orders are immutable");
-    }
+export const getAllOrders = async (
+  filters,
+) => {
+  const {
+    page,
+    limit,
+    status,
+    userId,
+    search,
+    startDate,
+    endDate,
+  } = filters;
 
-    if (order.status === "CANCELLED") {
-      throw new BadRequestError("Cancelled orders are immutable");
-    }
+  const { skip, take } =
+    getPaginationParams(
+      page,
+      limit,
+    );
 
-    // STATE MACHINE ENFORCEMENT
-    assertValidTransition(order.status, status);
+  const [data, total] =
+    await orderDb.findOrders({
+      status,
+      userId,
+      search,
+      startDate,
+      endDate,
+      skip,
+      take,
+    });
 
-    // If cancelling, restore stock
-    if (status === "CANCELLED" && order.status !== "CANCELLED") {
-      for (const item of order.items) {
-        await orderDb.restoreOrderItemStock(
+  return formatPaginatedResponse({
+    data,
+    total,
+    page,
+    limit,
+  });
+};
+
+// ============================================================
+// SINGLE ORDER
+// ============================================================
+
+export const getOrderById = async (
+  id,
+  user,
+) => {
+  const order =
+    await orderDb.findOrderById(id);
+
+  if (!order) {
+    throw new NotFoundError(
+      "Order not found",
+    );
+  }
+
+  const isOwner =
+    order.userId === user.id;
+
+  const isAdmin = [
+    "SUPER_ADMIN",
+    "ADMIN",
+    "STAFF",
+  ].includes(user.role);
+
+  if (!isOwner && !isAdmin) {
+    throw new NotFoundError(
+      "Order not found",
+    );
+  }
+
+  return order;
+};
+
+export const getOrderByOrderNumber = async (
+  orderNumber,
+  user,
+) => {
+  const order =
+    await orderDb.findOrderByOrderNumber(
+      orderNumber,
+    );
+
+  if (!order) {
+    throw new NotFoundError(
+      "Order not found",
+    );
+  }
+
+  const isOwner =
+    order.userId === user.id;
+
+  const isAdmin = [
+    "SUPER_ADMIN",
+    "ADMIN",
+    "STAFF",
+  ].includes(user.role);
+
+  if (!isOwner && !isAdmin) {
+    throw new NotFoundError(
+      "Order not found",
+    );
+  }
+
+  return order;
+};
+
+// ============================================================
+// ORDER STATUS
+// ============================================================
+
+export const updateOrderStatus = async (
+  id,
+  status,
+  userId,
+) => {
+  return prisma.$transaction(
+    async (tx) => {
+      const order =
+        await tx.order.findUnique({
+          where: {
+            id,
+          },
+
+          include: {
+            items: {
+              include: {
+                variant: true,
+              },
+            },
+          },
+        });
+
+      if (!order) {
+        throw new NotFoundError(
+          "Order not found",
+        );
+      }
+
+      // ------------------------------------------------------
+      // TERMINAL STATES
+      // ------------------------------------------------------
+
+      if (
+        order.status ===
+        "COMPLETED"
+      ) {
+        throw new BadRequestError(
+          "Completed orders are immutable",
+        );
+      }
+
+      if (
+        order.status ===
+        "CANCELLED"
+      ) {
+        throw new BadRequestError(
+          "Cancelled orders are immutable",
+        );
+      }
+
+      // ------------------------------------------------------
+      // STATE MACHINE
+      // ------------------------------------------------------
+
+      assertValidTransition(
+        order.status,
+        status,
+      );
+
+      // ------------------------------------------------------
+      // RESTORE STOCK ON CANCELLATION
+      // ------------------------------------------------------
+
+      if (
+        status === "CANCELLED"
+      ) {
+        for (const item of order.items) {
+          await orderDb.restoreOrderItemStock(
+            {
+              variantId:
+                item.variantId,
+
+              quantity:
+                item.quantity,
+            },
+            tx,
+          );
+        }
+      }
+
+      // ------------------------------------------------------
+      // UPDATE ORDER
+      // ------------------------------------------------------
+
+      const updatedOrder =
+        await orderDb.updateOrderStatusTx(
+          id,
           {
-            variantId: item.variantId,
-            quantity: item.quantity,
+            status,
           },
           tx,
         );
-      }
-    }
 
-    // Update order status
-    const updatedOrder = await orderDb.updateOrderStatusTx(id, { status }, tx);
+      // ------------------------------------------------------
+      // AUDIT
+      // ------------------------------------------------------
 
-    // Log status change
-    await orderDb.createAuditLog(
-      {
-        userId,
-        action: "ORDER_STATUS_CHANGE",
-        entity: "Order",
-        entityId: id,
-        metadata: {
-          from: order.status,
-          to: status,
+      await auditDb.createAuditLog(
+        {
+          userId,
+
+          action:
+            "ORDER_STATUS_CHANGE",
+
+          entity:
+            "Order",
+
+          entityId:
+            id,
+
+          metadata: {
+            from:
+              order.status,
+
+            to:
+              status,
+          },
         },
-      },
-      tx,
-    );
+        tx,
+      );
 
-    return updatedOrder;
-  });
+      return updatedOrder;
+    },
+  );
 };
 
-export const checkout = async ({ userId, payload }) => {
+// ============================================================
+// CHECKOUT
+// ============================================================
+
+export const checkout = async ({
+  userId,
+  payload,
+}) => {
   return checkoutService.checkout({
     userId,
     payload,
   });
 };
 
-export const getOrderTimeline = async (orderId, user) => {
-  const order = await orderDb.findOrderById(orderId);
+// ============================================================
+// ORDER TIMELINE
+// ============================================================
+
+export const getOrderTimeline = async (
+  orderId,
+  user,
+) => {
+  const order =
+    await orderDb.findOrderById(
+      orderId,
+    );
+
   if (!order) {
-    throw new NotFoundError("Order not found");
+    throw new NotFoundError(
+      "Order not found",
+    );
   }
 
-  const isOwner = order.userId === user.id;
-  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
+  const isOwner =
+    order.userId === user.id;
+
+  const isAdmin = [
+    "SUPER_ADMIN",
+    "ADMIN",
+    "STAFF",
+  ].includes(user.role);
 
   if (!isOwner && !isAdmin) {
-    throw new NotFoundError("Order not found");
+    throw new NotFoundError(
+      "Order not found",
+    );
   }
 
   const timeline = [
     {
-      status: "ORDER_CREATED",
-      timestamp: order.createdAt,
-      description: "Order created",
+      status:
+        "ORDER_CREATED",
+
+      timestamp:
+        order.createdAt,
+
+      description:
+        "Order created",
     },
   ];
 
-  // Get status changes from audit logs
-  const auditLogs = await orderDb.findOrderAuditLogs(orderId);
+  // ----------------------------------------------------------
+  // STATUS EVENTS
+  // ----------------------------------------------------------
+
+  const auditLogs =
+    await orderDb.findOrderAuditLogs(
+      orderId,
+    );
+
   for (const log of auditLogs) {
-    const metadata = log.metadata || {};
+    const metadata =
+      log.metadata || {};
+
     timeline.push({
-      status: metadata.to || "STATUS_CHANGED",
-      timestamp: log.createdAt,
-      description: `Order status changed from ${metadata.from} to ${metadata.to}`,
-      metadata: log.metadata,
+      status:
+        metadata.to ||
+        "STATUS_CHANGED",
+
+      timestamp:
+        log.createdAt,
+
+      description:
+        `Order status changed from ${metadata.from} to ${metadata.to}`,
+
+      metadata:
+        log.metadata,
     });
   }
 
-  // Get payment events
-  const payments = await orderDb.findOrderPayments(orderId);
+  // ----------------------------------------------------------
+  // PAYMENT EVENTS
+  // ----------------------------------------------------------
+
+  const payments =
+    await orderDb.findOrderPayments(
+      orderId,
+    );
+
   for (const payment of payments) {
     timeline.push({
-      status: `PAYMENT_${payment.status}`,
-      timestamp: payment.createdAt,
-      description: `Payment ${payment.status.toLowerCase()}: ${payment.reference}`,
+      status:
+        `PAYMENT_${payment.status}`,
+
+      timestamp:
+        payment.createdAt,
+
+      description:
+        `Payment ${payment.status.toLowerCase()}: ${payment.reference}`,
+
       metadata: {
-        amount: payment.amount,
-        provider: payment.provider,
-        reference: payment.reference,
+        amount:
+          payment.amount,
+
+        provider:
+          payment.provider,
+
+        reference:
+          payment.reference,
       },
     });
   }
 
-  // Get fulfillment events
-  const fulfillments = await orderDb.findOrderFulfillments(orderId);
+  // ----------------------------------------------------------
+  // FULFILLMENT EVENTS
+  // ----------------------------------------------------------
+
+  const fulfillments =
+    await orderDb.findOrderFulfillments(
+      orderId,
+    );
+
   for (const fulfillment of fulfillments) {
     timeline.push({
-      status: `FULFILLMENT_${fulfillment.status}`,
-      timestamp: fulfillment.createdAt,
-      description: `Fulfillment ${fulfillment.status.toLowerCase()}: ${fulfillment.type}`,
+      status:
+        `FULFILLMENT_${fulfillment.status}`,
+
+      timestamp:
+        fulfillment.createdAt,
+
+      description:
+        `Fulfillment ${fulfillment.status.toLowerCase()}: ${fulfillment.type}`,
+
       metadata: {
-        type: fulfillment.type,
-        trackingNumber: fulfillment.trackingNumber,
-        carrier: fulfillment.carrier,
+        type:
+          fulfillment.type,
+
+        trackingNumber:
+          fulfillment.trackingNumber,
+
+        carrier:
+          fulfillment.carrier,
       },
     });
   }
 
-  // Sort timeline by timestamp
-  timeline.sort((a, b) => a.timestamp - b.timestamp);
+  // ----------------------------------------------------------
+  // SORT
+  // ----------------------------------------------------------
+
+  timeline.sort(
+    (a, b) =>
+      new Date(a.timestamp) -
+      new Date(b.timestamp),
+  );
 
   return timeline;
 };
 
-export const updateOrderCBM = async (orderId, cbmData, adminUserId) => {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-    });
+// ============================================================
+// ORDER CBM UPDATE
+// ============================================================
 
-    if (!order) {
-      throw new NotFoundError("Order not found");
-    }
+export const updateOrderCBM = async (
+  orderId,
+  cbmData,
+  adminUserId,
+) => {
+  return prisma.$transaction(
+    async (tx) => {
+      const order =
+        await tx.order.findUnique({
+          where: {
+            id: orderId,
+          },
+        });
 
-    // Validate CBM data
-    if (!cbmData.totalCBM || cbmData.totalCBM <= 0) {
-      throw new BadRequestError("Invalid CBM data");
-    }
+      if (!order) {
+        throw new NotFoundError(
+          "Order not found",
+        );
+      }
 
-    // Update order with CBM
-    const updatedOrder = await orderDb.updateOrderCBM(
-      orderId,
-      {
-        cbm: cbmData.totalCBM,
-        chargeableWeight: cbmData.chargeableWeight || cbmData.totalCBM * 1000,
-        cbmData: cbmData,
-        cbmUpdatedAt: new Date(),
-        cbmUpdatedBy: adminUserId,
-      },
-      tx,
-    );
+      // ------------------------------------------------------
+      // VALIDATION
+      // ------------------------------------------------------
 
-    // Log CBM update
-    await orderDb.createAuditLog(
-      {
-        userId: adminUserId,
-        action: "ORDER_CBM_UPDATE",
-        entity: "Order",
-        entityId: orderId,
-        metadata: {
-          previousCBM: order.cbm,
-          newCBM: cbmData.totalCBM,
-          data: cbmData,
+      const totalCBM =
+        Number(cbmData?.totalCBM);
+
+      const chargeableWeight =
+        Number(
+          cbmData?.totalChargeableWeight ??
+            cbmData?.chargeableWeight,
+        );
+
+      if (
+        !Number.isFinite(totalCBM) ||
+        totalCBM < 0
+      ) {
+        throw new BadRequestError(
+          "Invalid CBM data",
+        );
+      }
+
+      if (
+        !Number.isFinite(
+          chargeableWeight,
+        ) ||
+        chargeableWeight < 0
+      ) {
+        throw new BadRequestError(
+          "Invalid chargeable weight",
+        );
+      }
+
+      // ------------------------------------------------------
+      // UPDATE
+      // ------------------------------------------------------
+
+      const updatedOrder =
+        await orderDb.updateOrderCBM(
+          orderId,
+          {
+            cbm: totalCBM,
+
+            chargeableWeight,
+
+            cbmData,
+
+            cbmUpdatedAt:
+              new Date(),
+
+            cbmUpdatedBy:
+              adminUserId,
+          },
+          tx,
+        );
+
+      // ------------------------------------------------------
+      // AUDIT
+      // ------------------------------------------------------
+
+      await auditDb.createAuditLog(
+        {
+          userId:
+            adminUserId,
+
+          action:
+            "ORDER_CBM_UPDATE",
+
+          entity:
+            "Order",
+
+          entityId:
+            orderId,
+
+          metadata: {
+            previousCBM:
+              order.cbm,
+
+            newCBM:
+              totalCBM,
+
+            previousChargeableWeight:
+              order.chargeableWeight,
+
+            newChargeableWeight:
+              chargeableWeight,
+
+            data:
+              cbmData,
+          },
         },
-      },
-      tx,
+        tx,
+      );
+
+      return updatedOrder;
+    },
+  );
+};
+
+// ============================================================
+// METRICS
+// ============================================================
+
+export const getOrderMetrics =
+  async () => {
+    return orderDb.getOrderMetrics();
+  };
+
+// ============================================================
+// FULFILLMENT TYPE
+// ============================================================
+
+export const getOrdersByFulfillmentType =
+  async (fulfillmentType) => {
+    return orderDb.findOrdersByFulfillmentType(
+      fulfillmentType,
     );
-
-    return updatedOrder;
-  });
-};
-
-export const getOrderMetrics = async () => {
-  return orderDb.getOrderMetrics();
-};
-
-export const getOrdersByFulfillmentType = async (fulfillmentType) => {
-  return orderDb.findOrdersByFulfillmentType(fulfillmentType);
-};
+  };

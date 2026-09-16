@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import * as auditDb from "./audit.db.js";
 
 export const logAudit = async ({
   userId = null,
@@ -6,31 +6,20 @@ export const logAudit = async ({
   entity,
   entityId = null,
   metadata = null,
+  tx = undefined,
 }) => {
-  return prisma.auditLog.create({
-    data: {
+  return auditDb.createAuditLog(
+    {
       userId,
       action,
       entity,
       entityId,
       metadata,
     },
-  });
+    tx,
+  );
 };
 
 export const getAuditLogs = async () => {
-  return prisma.auditLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    include: {
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          role: true,
-        },
-      },
-    },
-  });
+  return auditDb.getAuditLogs();
 };

@@ -1,292 +1,1032 @@
-// modules/shipping/shipping.service.js
-import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
-import { ShippingCalculator } from "./shipping.calculator.js";
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../classes/errorClasses.js";
+
 import * as shippingDb from "./shipping.db.js";
-import * as variantDb from "../variants/variant.db.js";
+import { ShippingCalculator } from "./shipping.calculator.js";
 
-// ============================================================================
-// SHIPPING CONFIGURATION CRUD
-// ============================================================================
+// ============================================================
+// HELPERS
+// ============================================================
 
-export const createShippingConfig = async (payload) => {
-  const { type } = payload;
+const toNumber = (value) => {
+  const number = Number(value);
 
-  if (type === "SEA" && !payload.pricePerCBM) {
-    throw new BadRequestError("Sea freight requires pricePerCBM");
-  }
-
-  if (type !== "SEA" && !payload.pricePerKg) {
-    throw new BadRequestError("Shipping requires pricePerKg");
-  }
-
-  return shippingDb.createShippingConfig(payload);
+  return Number.isFinite(number) ? number : 0;
 };
 
-export const updateShippingConfig = async (id, payload) => {
-  const config = await shippingDb.findShippingConfigById(id);
-  if (!config) {
-    throw new NotFoundError("Shipping configuration not found");
+const round = (value, decimals = 2) => {
+  const factor = 10 ** decimals;
+
+  return (
+    Math.round((toNumber(value) + Number.EPSILON) * factor) /
+    factor
+  );
+};
+
+const normalizeShippingType = (type) => {
+  return String(type || "LOCAL").toUpperCase();
+};
+
+const normalizeItems = (
+  items = [],
+  { allowEmpty = false } = {},
+) => {
+  if (!Array.isArray(items)) {
+    throw new BadRequestError(
+      "Shipping items must be an array",
+    );
   }
 
-  return shippingDb.updateShippingConfig(id, payload);
+  if (!allowEmpty && items.length === 0) {
+    throw new BadRequestError(
+      "Shipping calculation requires at least one item",
+    );
+  }
+
+  return items;
+};
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+
+export const createShippingConfig = async (data) => {
+  if (!data?.name?.trim()) {
+    throw new BadRequestError(
+      "Shipping configuration name is required",
+    );
+  }
+
+  return shippingDb.createShippingConfig({
+    ...data,
+
+    name: data.name.trim(),
+
+    pricePerKg: toNumber(data.pricePerKg),
+    pricePerCBM: toNumber(data.pricePerCBM),
+    handlingFee: toNumber(data.handlingFee),
+    minCharge: toNumber(data.minCharge),
+
+    freeShippingThreshold:
+      data.freeShippingThreshold == null
+        ? null
+        : toNumber(data.freeShippingThreshold),
+  });
+};
+
+export const updateShippingConfig = async (id, data) => {
+  const existing =
+    await shippingDb.findShippingConfigById(id);
+
+  if (!existing) {
+    throw new NotFoundError(
+      "Shipping configuration not found",
+    );
+  }
+
+  const updateData = {
+    ...data,
+  };
+
+  if ("name" in data) {
+    if (!data.name?.trim()) {
+      throw new BadRequestError(
+        "Shipping configuration name is required",
+      );
+    }
+
+    updateData.name = data.name.trim();
+  }
+
+  if ("pricePerKg" in data) {
+    updateData.pricePerKg = toNumber(data.pricePerKg);
+  }
+
+  if ("pricePerCBM" in data) {
+    updateData.pricePerCBM = toNumber(data.pricePerCBM);
+  }
+
+  if ("handlingFee" in data) {
+    updateData.handlingFee = toNumber(data.handlingFee);
+  }
+
+  if ("minCharge" in data) {
+    updateData.minCharge = toNumber(data.minCharge);
+  }
+
+  if ("freeShippingThreshold" in data) {
+    updateData.freeShippingThreshold =
+      data.freeShippingThreshold == null
+        ? null
+        : toNumber(data.freeShippingThreshold);
+  }
+
+  return shippingDb.updateShippingConfig(
+    id,
+    updateData,
+  );
 };
 
 export const getShippingConfig = async (id) => {
-  const config = await shippingDb.findShippingConfigById(id);
+  const config =
+    await shippingDb.findShippingConfigById(id);
+
   if (!config) {
-    throw new NotFoundError("Shipping configuration not found");
+    throw new NotFoundError(
+      "Shipping configuration not found",
+    );
   }
+
   return config;
 };
 
-export const getShippingConfigs = async (filters) => {
-  return shippingDb.findShippingConfigs(filters);
+export const getShippingConfigs = async () => {
+  return shippingDb.findShippingConfigs();
 };
 
 export const getActiveShippingConfig = async () => {
-  return shippingDb.getActiveShippingConfig();
-};
+  const config =
+    await shippingDb.getActiveShippingConfig();
 
-// ============================================================================
-// SHIPPING QUOTE (Pricing + Business Logic)
-// ============================================================================
-
-/**
- * Calculate shipping quote with pricing
- * This is where BUSINESS pricing logic lives
- */
-export const calculateShippingQuote = async (
-  items,
-  destination,
-  options = {},
-) => {
-  // 1. Calculate pure logistics metrics
-  const metrics = ShippingCalculator.calculateOrder(items);
-
-  // 2. Load shipping configuration
-  const config = await shippingDb.getActiveShippingConfig();
   if (!config) {
-    throw new BadRequestError("No active shipping configuration found");
+    throw new NotFoundError(
+      "No active shipping configuration found",
+    );
   }
 
-  // 3. Load shipping rules
-  const rules = await shippingDb.findShippingRules({
-    isActive: true,
-  });
+  return config;
+};
 
-  // 4. Apply pricing rules based on destination and metrics
-  const shippingCost = calculateShippingCost({
-    metrics,
-    config,
-    rules,
-    destination,
-    options,
-  });
+// ============================================================
+// SHIPPING RULES
+// ============================================================
 
-  // 5. Return complete shipping quote
-  return {
-    ...metrics,
-    shippingCost: round(shippingCost, 2),
-    grandTotal: round(metrics.subtotal + shippingCost, 2),
-    config: {
-      id: config.id,
-      name: config.name,
-      type: config.type,
-      estimatedDeliveryMin: config.deliveryEstimateMin,
-      estimatedDeliveryMax: config.deliveryEstimateMax,
-    },
-    rulesApplied: rules.map((r) => r.name),
+export const createShippingRule = async (data) => {
+  if (!data?.name?.trim()) {
+    throw new BadRequestError(
+      "Shipping rule name is required",
+    );
+  }
+
+  if (!data.configurationId) {
+    throw new BadRequestError(
+      "Shipping configuration is required",
+    );
+  }
+
+  const configuration =
+    await shippingDb.findShippingConfigById(
+      data.configurationId,
+    );
+
+  if (!configuration) {
+    throw new NotFoundError(
+      "Shipping configuration not found",
+    );
+  }
+
+  return shippingDb.createShippingRule({
+    ...data,
+
+    name: data.name.trim(),
+
+    baseRate: toNumber(data.baseRate),
+    ratePerKg: toNumber(data.ratePerKg),
+    ratePerCBM: toNumber(data.ratePerCBM),
+
+    minSubtotal:
+      data.minSubtotal == null
+        ? null
+        : toNumber(data.minSubtotal),
+
+    maxSubtotal:
+      data.maxSubtotal == null
+        ? null
+        : toNumber(data.maxSubtotal),
+
+    minWeight:
+      data.minWeight == null
+        ? null
+        : toNumber(data.minWeight),
+
+    maxWeight:
+      data.maxWeight == null
+        ? null
+        : toNumber(data.maxWeight),
+
+    priority:
+      data.priority == null
+        ? 0
+        : Number(data.priority),
+  });
+};
+
+export const updateShippingRule = async (
+  id,
+  data,
+) => {
+  const existing =
+    await shippingDb.findShippingRuleById(id);
+
+  if (!existing) {
+    throw new NotFoundError(
+      "Shipping rule not found",
+    );
+  }
+
+  const updateData = {
+    ...data,
   };
+
+  if ("name" in data) {
+    if (!data.name?.trim()) {
+      throw new BadRequestError(
+        "Shipping rule name is required",
+      );
+    }
+
+    updateData.name = data.name.trim();
+  }
+
+  if ("baseRate" in data) {
+    updateData.baseRate = toNumber(data.baseRate);
+  }
+
+  if ("ratePerKg" in data) {
+    updateData.ratePerKg = toNumber(data.ratePerKg);
+  }
+
+  if ("ratePerCBM" in data) {
+    updateData.ratePerCBM = toNumber(data.ratePerCBM);
+  }
+
+  if ("minSubtotal" in data) {
+    updateData.minSubtotal =
+      data.minSubtotal == null
+        ? null
+        : toNumber(data.minSubtotal);
+  }
+
+  if ("maxSubtotal" in data) {
+    updateData.maxSubtotal =
+      data.maxSubtotal == null
+        ? null
+        : toNumber(data.maxSubtotal);
+  }
+
+  if ("minWeight" in data) {
+    updateData.minWeight =
+      data.minWeight == null
+        ? null
+        : toNumber(data.minWeight);
+  }
+
+  if ("maxWeight" in data) {
+    updateData.maxWeight =
+      data.maxWeight == null
+        ? null
+        : toNumber(data.maxWeight);
+  }
+
+  if ("priority" in data) {
+    const priority = Number(data.priority);
+
+    if (!Number.isFinite(priority)) {
+      throw new BadRequestError(
+        "Shipping rule priority must be a valid number",
+      );
+    }
+
+    updateData.priority = priority;
+  }
+
+  return shippingDb.updateShippingRule(
+    id,
+    updateData,
+  );
 };
 
-/**
- * Calculate shipping cost by applying business rules
- * This is where all pricing logic lives
- */
-const calculateShippingCost = ({
-  metrics,
-  config,
-  rules,
-  destination,
-  options,
-}) => {
-  const { totalChargeableWeight, totalCBM } = metrics;
-  let cost = 0;
+export const getShippingRule = async (id) => {
+  const rule =
+    await shippingDb.findShippingRuleById(id);
 
-  // Rule 1: Free shipping threshold
+  if (!rule) {
+    throw new NotFoundError(
+      "Shipping rule not found",
+    );
+  }
+
+  return rule;
+};
+
+export const getShippingRules = async (filters = {}) => {
+  return shippingDb.findShippingRules(filters);
+};
+
+export const deleteShippingRule = async (id) => {
+  const existing =
+    await shippingDb.findShippingRuleById(id);
+
+  if (!existing) {
+    throw new NotFoundError(
+      "Shipping rule not found",
+    );
+  }
+
+  return shippingDb.deleteShippingRule(id);
+};
+
+// ============================================================
+// RULE MATCHING
+// ============================================================
+
+const ruleMatchesMetrics = (rule, metrics) => {
+  const subtotal = toNumber(metrics.subtotal);
+
+  const chargeableWeight = toNumber(
+    metrics.totalChargeableWeight,
+  );
+
   if (
-    config.freeShippingThreshold &&
-    metrics.subtotal >= config.freeShippingThreshold
+    rule.minSubtotal != null &&
+    subtotal < toNumber(rule.minSubtotal)
   ) {
-    return 0;
-  }
-
-  // Rule 2: Apply shipping rules in priority order
-  for (const rule of rules) {
-    if (isRuleApplicable(rule, { metrics, destination, options })) {
-      cost = calculateRuleCost(rule, { metrics, config });
-      break;
-    }
-  }
-
-  // Rule 3: Default pricing using config
-  if (cost === 0) {
-    if (config.type === "SEA") {
-      cost = totalCBM * (config.pricePerCBM || 0);
-    } else {
-      cost = totalChargeableWeight * (config.pricePerKg || 0);
-    }
-  }
-
-  // Rule 4: Apply handling fee
-  if (config.handlingFee) {
-    cost += Number(config.handlingFee);
-  }
-
-  // Rule 5: Apply minimum charge
-  if (config.minCharge) {
-    cost = Math.max(cost, Number(config.minCharge));
-  }
-
-  return cost;
-};
-
-/**
- * Check if a shipping rule applies to the current order
- */
-const isRuleApplicable = (rule, { metrics, destination, options }) => {
-  // Zone rules
-  if (rule.type === "ZONE" && rule.zone) {
-    const zoneMatches = destination?.zone === rule.zone;
-    if (!zoneMatches) return false;
-  }
-
-  // Weight rules
-  if (rule.minWeight && metrics.totalChargeableWeight < rule.minWeight)
     return false;
-  if (rule.maxWeight && metrics.totalChargeableWeight > rule.maxWeight)
-    return false;
+  }
 
-  // Order amount rules
-  if (rule.minOrderAmount && metrics.subtotal < rule.minOrderAmount)
+  if (
+    rule.maxSubtotal != null &&
+    subtotal > toNumber(rule.maxSubtotal)
+  ) {
     return false;
-  if (rule.maxOrderAmount && metrics.subtotal > rule.maxOrderAmount)
+  }
+
+  if (
+    rule.minWeight != null &&
+    chargeableWeight < toNumber(rule.minWeight)
+  ) {
     return false;
+  }
+
+  if (
+    rule.maxWeight != null &&
+    chargeableWeight > toNumber(rule.maxWeight)
+  ) {
+    return false;
+  }
 
   return true;
 };
 
-/**
- * Calculate cost based on a specific rule
- */
-const calculateRuleCost = (rule, { metrics, config }) => {
-  let cost = Number(rule.baseRate) || 0;
+const findApplicableRule = (
+  rules,
+  shippingType,
+  metrics,
+) => {
+  const normalizedType =
+    normalizeShippingType(shippingType);
 
-  // Add per-kg rate if applicable
-  if (rule.ratePerKg) {
-    cost += metrics.totalChargeableWeight * Number(rule.ratePerKg);
-  }
+  const sortedRules = [...rules].sort(
+    (a, b) =>
+      Number(a.priority || 0) -
+      Number(b.priority || 0),
+  );
 
-  // If rule doesn't have ratePerKg, fall back to config price
-  if (!rule.ratePerKg && config.pricePerKg) {
-    cost += metrics.totalChargeableWeight * Number(config.pricePerKg);
-  }
+  return (
+    sortedRules.find((rule) => {
+      if (!rule.isActive) {
+        return false;
+      }
 
-  return cost;
+      const ruleType =
+        String(rule.type || "DEFAULT").toUpperCase();
+
+      if (
+        ruleType !== "DEFAULT" &&
+        ruleType !== normalizedType
+      ) {
+        return false;
+      }
+
+      return ruleMatchesMetrics(
+        rule,
+        metrics,
+      );
+    }) || null
+  );
 };
 
-/**
- * Round a number to 2 decimal places
- */
-const round = (value, decimals = 2) => Number(Number(value).toFixed(decimals));
+// ============================================================
+// GROUPING
+// ============================================================
 
-// ============================================================================
-// LEGACY METHODS (Keep for backward compatibility)
-// ============================================================================
+const groupItemsByShippingType = (items) => {
+  const groups = {};
 
-export const calculateShippingForCart = async (cartItems) => {
-  // Fetch variants for all cart items
-  const variantIds = cartItems.map((item) => item.variantId);
-  const variants = await variantDb.findVariantsByIds(variantIds);
+  for (const item of items) {
+    const type = normalizeShippingType(
+      item.shippingType,
+    );
 
-  // Build items array with dimensions
-  const items = cartItems.map((cartItem) => {
-    const variant = variants.find((v) => v.id === cartItem.variantId);
-    return {
-      variantId: cartItem.variantId,
-      name: variant?.product?.name || "Unknown",
-      quantity: cartItem.quantity,
-      unitPrice: cartItem.unitPriceSnapshot,
-      length: variant?.length || null,
-      width: variant?.width || null,
-      height: variant?.height || null,
-      actualWeight: variant?.actualWeight || 0,
-      shippingType: variant?.shippingType || "LOCAL",
-      fulfillmentType: variant?.fulfillmentType || "LOCAL",
-    };
-  });
+    if (!groups[type]) {
+      groups[type] = [];
+    }
 
-  // Calculate shipping metrics
-  const metrics = ShippingCalculator.calculateOrder(items);
+    groups[type].push(item);
+  }
 
-  // Get shipping configuration
-  const config = await shippingDb.getActiveShippingConfig();
+  return groups;
+};
 
-  // Calculate shipping cost
-  const rules = await shippingDb.findShippingRules({ isActive: true });
-  const shippingCost = calculateShippingCost({
-    metrics,
-    config,
-    rules,
-    destination: null,
-    options: {},
-  });
-
+const calculateGroupMetrics = (items) => {
   return {
-    ...metrics,
-    shippingCost: round(shippingCost, 2),
-    grandTotal: round(metrics.subtotal + shippingCost, 2),
-    config,
     items,
+
+    subtotal: round(
+      items.reduce(
+        (sum, item) =>
+          sum + toNumber(item.subtotal),
+        0,
+      ),
+      2,
+    ),
+
+    totalCBM: round(
+      items.reduce(
+        (sum, item) =>
+          sum + toNumber(item.cbm),
+        0,
+      ),
+      4,
+    ),
+
+    totalActualWeight: round(
+      items.reduce(
+        (sum, item) =>
+          sum + toNumber(item.actualWeight),
+        0,
+      ),
+      2,
+    ),
+
+    totalChargeableWeight: round(
+      items.reduce(
+        (sum, item) =>
+          sum +
+          toNumber(item.chargeableWeight),
+        0,
+      ),
+      2,
+    ),
   };
 };
 
-export const calculateCBMForVariant = async (variantId) => {
-  const variant = await variantDb.findVariantById(variantId);
-  if (!variant) {
-    throw new NotFoundError("Variant not found");
+// ============================================================
+// BASE SHIPPING COST
+// ============================================================
+
+const calculateGroupBaseShippingCost = (
+  shippingType,
+  metrics,
+  config,
+) => {
+  const type =
+    normalizeShippingType(shippingType);
+
+  const chargeableWeight =
+    toNumber(
+      metrics.totalChargeableWeight,
+    );
+
+  const cbm =
+    toNumber(metrics.totalCBM);
+
+  switch (type) {
+    case "SEA":
+      return (
+        cbm *
+        toNumber(config.pricePerCBM)
+      );
+
+    case "AIR":
+    case "IMPORT":
+    case "LOCAL":
+      return (
+        chargeableWeight *
+        toNumber(config.pricePerKg)
+      );
+
+    case "DIGITAL":
+      return 0;
+
+    default:
+      return (
+        chargeableWeight *
+        toNumber(config.pricePerKg)
+      );
+  }
+};
+
+// ============================================================
+// RULE COST
+// ============================================================
+
+const calculateRuleCost = (
+  rule,
+  metrics,
+) => {
+  const baseRate =
+    toNumber(rule.baseRate);
+
+  const weightCost =
+    toNumber(
+      metrics.totalChargeableWeight,
+    ) *
+    toNumber(rule.ratePerKg);
+
+  const cbmCost =
+    toNumber(metrics.totalCBM) *
+    toNumber(rule.ratePerCBM);
+
+  return (
+    baseRate +
+    weightCost +
+    cbmCost
+  );
+};
+
+// ============================================================
+// SHIPPING COST
+// ============================================================
+
+export const calculateShippingCost = ({
+  items,
+  metrics,
+  config,
+  rules,
+}) => {
+  const subtotal =
+    toNumber(metrics.subtotal);
+
+  // ----------------------------------------------------------
+  // NO SHIPPABLE ITEMS
+  // ----------------------------------------------------------
+
+  if (!items || items.length === 0) {
+    return {
+      shippingCost: 0,
+      source: "NO_PHYSICAL_SHIPPING",
+      rule: null,
+      groups: [],
+    };
   }
 
-  if (!variant.length || !variant.width || !variant.height) {
-    throw new BadRequestError("Variant dimensions not set");
+  // ----------------------------------------------------------
+  // FREE SHIPPING
+  // ----------------------------------------------------------
+
+  if (
+    config.freeShippingThreshold != null &&
+    subtotal >=
+      toNumber(
+        config.freeShippingThreshold,
+      )
+  ) {
+    return {
+      shippingCost: 0,
+      source:
+        "FREE_SHIPPING_THRESHOLD",
+      rule: null,
+      groups: [],
+    };
   }
 
-  const item = {
-    quantity: 1,
-    unitPrice: Number(variant.price),
-    actualWeight: Number(variant.actualWeight),
-    length: Number(variant.length),
-    width: Number(variant.width),
-    height: Number(variant.height),
-    shippingType: variant.shippingType || "SEA",
-  };
+  // ----------------------------------------------------------
+  // GROUP BY SHIPPING TYPE
+  // ----------------------------------------------------------
 
-  const result = ShippingCalculator.calculateItem(item);
+  const groups =
+    groupItemsByShippingType(items);
+
+  const groupQuotes = [];
+
+  for (const [
+    shippingType,
+    groupItems,
+  ] of Object.entries(groups)) {
+    const groupMetrics =
+      calculateGroupMetrics(
+        groupItems,
+      );
+
+    // --------------------------------------------------------
+    // DIGITAL PRODUCTS
+    // --------------------------------------------------------
+
+    if (
+      shippingType === "DIGITAL"
+    ) {
+      groupQuotes.push({
+        shippingType,
+        ...groupMetrics,
+        shippingCost: 0,
+        pricingSource: "DIGITAL",
+        rule: null,
+      });
+
+      continue;
+    }
+
+    const rule =
+      findApplicableRule(
+        rules,
+        shippingType,
+        groupMetrics,
+      );
+
+    let shippingCost;
+    let pricingSource;
+
+    if (rule) {
+      shippingCost =
+        calculateRuleCost(
+          rule,
+          groupMetrics,
+        );
+
+      pricingSource = "RULE";
+    } else {
+      shippingCost =
+        calculateGroupBaseShippingCost(
+          shippingType,
+          groupMetrics,
+          config,
+        );
+
+      pricingSource =
+        "CONFIGURATION";
+    }
+
+    groupQuotes.push({
+      shippingType,
+
+      ...groupMetrics,
+
+      shippingCost:
+        round(
+          shippingCost,
+          2,
+        ),
+
+      pricingSource,
+
+      rule: rule
+        ? {
+            id: rule.id,
+            name: rule.name,
+            type: rule.type,
+            priority:
+              rule.priority,
+          }
+        : null,
+    });
+  }
+
+  // ----------------------------------------------------------
+  // TOTAL RAW SHIPPING
+  // ----------------------------------------------------------
+
+  const rawShippingCost =
+    groupQuotes.reduce(
+      (sum, group) =>
+        sum +
+        toNumber(
+          group.shippingCost,
+        ),
+      0,
+    );
+
+  // ----------------------------------------------------------
+  // PHYSICAL SHIPPING CHECK
+  // ----------------------------------------------------------
+
+  const hasPhysicalShipping =
+    groupQuotes.some(
+      (group) =>
+        group.shippingType !==
+        "DIGITAL",
+    );
+
+  if (!hasPhysicalShipping) {
+    return {
+      shippingCost: 0,
+      source:
+        "NO_PHYSICAL_SHIPPING",
+      rule: null,
+      groups: groupQuotes,
+    };
+  }
+
+  // ----------------------------------------------------------
+  // ORDER-LEVEL HANDLING FEE
+  // ----------------------------------------------------------
+
+  let shippingCost =
+    rawShippingCost;
+
+  shippingCost +=
+    toNumber(
+      config.handlingFee,
+    );
+
+  // ----------------------------------------------------------
+  // MINIMUM SHIPPING CHARGE
+  // ----------------------------------------------------------
+
+  if (
+    shippingCost > 0 &&
+    toNumber(config.minCharge) > 0
+  ) {
+    shippingCost =
+      Math.max(
+        shippingCost,
+        toNumber(
+          config.minCharge,
+        ),
+      );
+  }
 
   return {
-    variantId,
-    sku: variant.sku,
-    cbm: result.cbm,
-    volumetricWeight: result.volumetricWeight,
-    chargeableWeight: result.chargeableWeight,
-    dimensions: {
-      length: variant.length,
-      width: variant.width,
-      height: variant.height,
+    shippingCost:
+      round(
+        shippingCost,
+        2,
+      ),
+
+    source:
+      groupQuotes.some(
+        (group) =>
+          group.pricingSource ===
+          "RULE",
+      )
+        ? "RULES"
+        : "CONFIGURATION",
+
+    rule: null,
+
+    groups:
+      groupQuotes,
+  };
+};
+
+// ============================================================
+// PUBLIC SHIPPING QUOTE
+// ============================================================
+
+export const calculateShippingQuote = async ({
+  items,
+  destination = null,
+}) => {
+  const normalizedItems =
+    normalizeItems(items, {
+      allowEmpty: true,
+    });
+
+  // ----------------------------------------------------------
+  // NO SHIPPABLE ITEMS
+  // ----------------------------------------------------------
+
+  if (normalizedItems.length === 0) {
+    return {
+      destination,
+
+      items: [],
+
+      subtotal: 0,
+
+      totalCBM: 0,
+
+      totalActualWeight: 0,
+
+      totalChargeableWeight: 0,
+
+      shippingCost: 0,
+
+      grandTotal: 0,
+
+      pricingSource:
+        "NO_PHYSICAL_SHIPPING",
+
+      groups: [],
+
+      configuration: null,
+    };
+  }
+
+  // ----------------------------------------------------------
+  // CALCULATE LOGISTICS
+  // ----------------------------------------------------------
+
+  const calculated =
+    ShippingCalculator.calculateOrder(
+      normalizedItems,
+    );
+
+  // ----------------------------------------------------------
+  // LOAD SHIPPING CONFIG
+  // ----------------------------------------------------------
+
+  const config =
+    await shippingDb.getActiveShippingConfig();
+
+  if (!config) {
+    throw new NotFoundError(
+      "No active shipping configuration found",
+    );
+  }
+
+  // ----------------------------------------------------------
+  // CALCULATE SHIPPING COST
+  // ----------------------------------------------------------
+
+  const quote =
+    calculateShippingCost({
+      items:
+        calculated.items,
+
+      metrics:
+        calculated,
+
+      config,
+
+      rules:
+        config.rules || [],
+    });
+
+  return {
+    destination,
+
+    items:
+      calculated.items,
+
+    subtotal:
+      calculated.subtotal,
+
+    totalCBM:
+      calculated.totalCBM,
+
+    totalActualWeight:
+      calculated.totalActualWeight,
+
+    totalChargeableWeight:
+      calculated.totalChargeableWeight,
+
+    shippingCost:
+      quote.shippingCost,
+
+    grandTotal:
+      round(
+        calculated.subtotal +
+          quote.shippingCost,
+        2,
+      ),
+
+    pricingSource:
+      quote.source,
+
+    groups:
+      quote.groups,
+
+    configuration: {
+      id: config.id,
+      name: config.name,
+      status: config.status,
     },
   };
 };
 
-export const updateOrderWithCBM = async (orderId, cbmData) => {
-  return shippingDb.updateOrderCBM(orderId, cbmData);
+// ============================================================
+// CART SHIPPING
+// ============================================================
+
+export const calculateShippingForCart = async ({
+  cartItems,
+  destination = null,
+}) => {
+  if (
+    !Array.isArray(cartItems) ||
+    cartItems.length === 0
+  ) {
+    throw new BadRequestError(
+      "Cart is empty",
+    );
+  }
+
+  const items = cartItems.map((item) => {
+    const variant =
+      item.variant;
+
+    if (!variant) {
+      throw new BadRequestError(
+        "Cart item variant is missing",
+      );
+    }
+
+    return {
+      variantId:
+        item.variantId,
+
+      quantity:
+        toNumber(item.quantity),
+
+      unitPrice:
+        toNumber(
+          item.unitPriceSnapshot,
+        ),
+
+      shippingType:
+        variant.shippingType ||
+        "LOCAL",
+
+      fulfillmentType:
+        variant.fulfillmentType ||
+        "LOCAL",
+
+      length:
+        variant.length,
+
+      width:
+        variant.width,
+
+      height:
+        variant.height,
+
+      actualWeight:
+        variant.actualWeight,
+
+      weight:
+        variant.weight,
+    };
+  });
+
+  return calculateShippingQuote({
+    items,
+    destination,
+  });
+};
+
+// ============================================================
+// VARIANT CBM
+// ============================================================
+
+export const calculateCBMForVariant = ({
+  length,
+  width,
+  height,
+  quantity = 1,
+  actualWeight = 0,
+  shippingType = "LOCAL",
+}) => {
+  return ShippingCalculator.calculateItem({
+    length,
+    width,
+    height,
+    quantity,
+    actualWeight,
+    shippingType,
+    unitPrice: 0,
+  });
+};
+
+// ============================================================
+// ORDER CBM
+// ============================================================
+
+export const updateOrderWithCBM = async ({
+  orderId,
+  items,
+  updatedBy = null,
+}) => {
+  const calculated =
+    ShippingCalculator.calculateOrder(
+      normalizeItems(items),
+    );
+
+  return shippingDb.updateOrderCBM(
+    orderId,
+    {
+      totalCBM:
+        calculated.totalCBM,
+
+      totalChargeableWeight:
+        calculated.totalChargeableWeight,
+
+      items:
+        calculated.items,
+
+      updatedBy,
+    },
+  );
 };

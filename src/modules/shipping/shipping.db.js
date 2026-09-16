@@ -1,73 +1,196 @@
 import { prisma } from "../../config/prisma.js";
 
-export const createShippingConfig = (data) => {
-  return prisma.shippingConfiguration.create({ data });
+// ============================================================
+// SHIPPING CONFIGURATION
+// ============================================================
+
+export const createShippingConfig = async (
+  data,
+  tx = prisma,
+) => {
+  return tx.shippingConfiguration.create({
+    data,
+    include: {
+      rules: {
+        orderBy: {
+          priority: "asc",
+        },
+      },
+    },
+  });
 };
 
-export const findShippingConfigById = (id) => {
-  return prisma.shippingConfiguration.findUnique({
+export const updateShippingConfig = async (
+  id,
+  data,
+  tx = prisma,
+) => {
+  return tx.shippingConfiguration.update({
     where: { id },
+    data,
+    include: {
+      rules: {
+        orderBy: {
+          priority: "asc",
+        },
+      },
+    },
   });
 };
 
-export const findShippingConfigs = (filters = {}) => {
-  const { isActive, type } = filters;
-  const where = {
-    ...(typeof isActive === "boolean" && { isActive }),
-    ...(type && { type }),
-  };
-
-  return prisma.shippingConfiguration.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
+export const findShippingConfigById = async (
+  id,
+  tx = prisma,
+) => {
+  return tx.shippingConfiguration.findUnique({
+    where: { id },
+    include: {
+      rules: {
+        orderBy: {
+          priority: "asc",
+        },
+      },
+    },
   });
 };
 
-export const getActiveShippingConfig = () => {
-  return prisma.shippingConfiguration.findFirst({
-    where: { isActive: true },
-    orderBy: { createdAt: "desc" },
+export const getActiveShippingConfig = async (
+  tx = prisma,
+) => {
+  return tx.shippingConfiguration.findFirst({
+    where: {
+      status: "ACTIVE",
+    },
+    include: {
+      rules: {
+        where: {
+          isActive: true,
+        },
+        orderBy: {
+          priority: "asc",
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
   });
 };
 
-export const updateShippingConfig = (id, data) => {
-  return prisma.shippingConfiguration.update({
+export const findShippingConfigs = async (
+  tx = prisma,
+) => {
+  return tx.shippingConfiguration.findMany({
+    include: {
+      rules: {
+        orderBy: {
+          priority: "asc",
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+  });
+};
+
+// ============================================================
+// SHIPPING RULES
+// ============================================================
+
+export const createShippingRule = async (
+  data,
+  tx = prisma,
+) => {
+  return tx.shippingRule.create({
+    data,
+  });
+};
+
+export const updateShippingRule = async (
+  id,
+  data,
+  tx = prisma,
+) => {
+  return tx.shippingRule.update({
     where: { id },
     data,
   });
 };
 
-export const deleteShippingConfig = (id) => {
-  return prisma.shippingConfiguration.delete({
+export const findShippingRuleById = async (
+  id,
+  tx = prisma,
+) => {
+  return tx.shippingRule.findUnique({
     where: { id },
   });
 };
 
-export const createShippingRule = (data) => {
-  return prisma.shippingRule.create({ data });
-};
+export const findShippingRules = async (
+  {
+    configurationId,
+    type,
+    isActive,
+  } = {},
+  tx = prisma,
+) => {
+  const where = {};
 
-export const findShippingRules = (filters = {}) => {
-  const { isActive, type } = filters;
-  const where = {
-    ...(typeof isActive === "boolean" && { isActive }),
-    ...(type && { type }),
-  };
+  if (configurationId) {
+    where.configurationId = configurationId;
+  }
 
-  return prisma.shippingRule.findMany({
+  if (type) {
+    where.type = type;
+  }
+
+  if (typeof isActive === "boolean") {
+    where.isActive = isActive;
+  }
+
+  return tx.shippingRule.findMany({
     where,
-    orderBy: { priority: "asc" },
-  });
-};
-
-export const updateOrderCBM = (orderId, cbmData) => {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: {
-      metadata: {
-        ...cbmData,
-        calculatedAt: new Date(),
-      },
+    orderBy: {
+      priority: "asc",
     },
   });
 };
+
+export const deleteShippingRule = async (
+  id,
+  tx = prisma,
+) => {
+  return tx.shippingRule.delete({
+    where: { id },
+  });
+};
+
+// ============================================================
+// ORDER CBM
+// ============================================================
+
+export const updateOrderCBM = async (
+  orderId,
+  {
+    totalCBM,
+    totalChargeableWeight,
+    items,
+    updatedBy = null,
+  },
+  tx = prisma,
+) => {
+  return tx.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      cbm: totalCBM,
+      chargeableWeight: totalChargeableWeight,
+      cbmData: items,
+      cbmUpdatedAt: new Date(),
+      cbmUpdatedBy: updatedBy,
+    },
+  });
+};
+
