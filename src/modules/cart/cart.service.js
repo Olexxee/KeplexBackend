@@ -1,49 +1,42 @@
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
 import * as cartDb from "./cart.db.js";
 import * as variantDb from "../variants/variant.db.js";
-import { CBMCalculator } from "../shipping/cbm.calculator.js";
+
+// ============================================================
+// HELPERS
+// ============================================================
 
 const toNumber = (value) => Number(value);
 
+const toPositiveInteger = (value, field = "Quantity") => {
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new BadRequestError(`${field} must be a positive integer`);
+  }
+
+  return number;
+};
+
+// ============================================================
+// CART FORMATTER
+// ============================================================
+
 const formatCart = (cart) => {
-  const items = cart.items || [];
+  const items = cart?.items || [];
 
   const subtotal = items.reduce((sum, cartItem) => {
-    return sum + toNumber(cartItem.unitPriceSnapshot) * cartItem.quantity;
+    return (
+      sum + toNumber(cartItem.unitPriceSnapshot) * Number(cartItem.quantity)
+    );
   }, 0);
 
   const totalWeight = items.reduce((sum, cartItem) => {
-    const weight = cartItem.variant?.weight || 0;
+    const actualWeight =
+      cartItem.variant?.actualWeight ?? cartItem.variant?.weight ?? 0;
 
-    return sum + toNumber(weight) * cartItem.quantity;
+    return sum + toNumber(actualWeight) * Number(cartItem.quantity);
   }, 0);
-
-  let totalCBM = 0;
-
-  const cbmItems = [];
-
-  for (const cartItem of items) {
-    const variant = cartItem.variant;
-
-    if (variant?.length && variant?.width && variant?.height) {
-      const cbm =
-        CBMCalculator.calculateCBM({
-          length: Number(variant.length),
-          width: Number(variant.width),
-          height: Number(variant.height),
-        }) * cartItem.quantity;
-
-      totalCBM += cbm;
-
-      cbmItems.push({
-        variantId: variant.id,
-        sku: variant.sku,
-        productName: variant.product?.name || "Unknown",
-        cbm: Number(cbm.toFixed(4)),
-        quantity: cartItem.quantity,
-      });
-    }
-  }
 
   return {
     id: cart.id,
@@ -53,48 +46,62 @@ const formatCart = (cart) => {
     items: items.map((cartItem) => {
       const variant = cartItem.variant;
 
-      const currentPrice = toNumber(cartItem.unitPriceSnapshot);
+      const quantity = Number(cartItem.quantity);
 
-      const stock = variant?.stock || 0;
+      const unitPrice = toNumber(cartItem.unitPriceSnapshot);
+
+      const stock = Number(variant?.stock || 0);
 
       return {
         id: cartItem.id,
-        variantId: cartItem.variantId,
-        quantity: cartItem.quantity,
 
-        unitPrice: currentPrice,
-        lineTotal: currentPrice * cartItem.quantity,
+        variantId: cartItem.variantId,
+
+        quantity,
+
+        unitPrice,
+
+        lineTotal: unitPrice * quantity,
 
         variant: variant
           ? {
               id: variant.id,
+
               sku: variant.sku,
+
               color: variant.color,
+
               size: variant.size,
 
               price: Number(variant.price),
-              weight: Number(variant.weight),
+
+              weight: variant.weight != null ? Number(variant.weight) : null,
+
+              actualWeight:
+                variant.actualWeight != null
+                  ? Number(variant.actualWeight)
+                  : null,
 
               stock: variant.stock,
+
               isActive: variant.isActive,
 
               fulfillmentType: variant.fulfillmentType,
+
               shippingType: variant.shippingType,
 
-              length: variant.length ? Number(variant.length) : null,
+              length: variant.length != null ? Number(variant.length) : null,
 
-              width: variant.width ? Number(variant.width) : null,
+              width: variant.width != null ? Number(variant.width) : null,
 
-              height: variant.height ? Number(variant.height) : null,
+              height: variant.height != null ? Number(variant.height) : null,
 
-              cbm: variant.cbm ? Number(variant.cbm) : null,
+              // Product/variant CBM is retained only as
+              // product data for display/reference.
+              // Checkout shipping calculations must use
+              // ShippingCalculator.
+              cbm: variant.cbm != null ? Number(variant.cbm) : null,
 
-              actualWeight: variant.actualWeight
-                ? Number(variant.actualWeight)
-                : null,
-
-              // Prisma relation is `media`.
-              // Frontend contract is `images`.
               images: variant.media || [],
 
               product: variant.product
@@ -110,25 +117,31 @@ const formatCart = (cart) => {
           : null,
 
         availableStock: stock,
-        inStock: stock >= cartItem.quantity,
+
+        inStock: Boolean(variant?.isActive) && stock >= quantity,
+
         unavailable: !variant || !variant.isActive,
       };
     }),
 
-    subtotal,
+    subtotal: Number(subtotal.toFixed(2)),
 
     totalWeight: Number(totalWeight.toFixed(2)),
 
-    totalCBM: Number(totalCBM.toFixed(4)),
-
-    cbmItems,
-
-    totalItems: items.reduce((sum, cartItem) => sum + cartItem.quantity, 0),
+    totalItems: items.reduce(
+      (sum, cartItem) => sum + Number(cartItem.quantity),
+      0,
+    ),
 
     createdAt: cart.createdAt,
+
     updatedAt: cart.updatedAt,
   };
 };
+
+// ============================================================
+// ACTIVE CART
+// ============================================================
 
 const getOrCreateActiveCart = async (userId) => {
   const existingCart = await cartDb.findActiveCartByUserId(userId);
@@ -142,7 +155,13 @@ const getOrCreateActiveCart = async (userId) => {
   return cartDb.findActiveCartByUserId(userId);
 };
 
+// ============================================================
+// VARIANT VALIDATION
+// ============================================================
+
 const ensureVariantCanBeAdded = async ({ variantId, quantity }) => {
+  const normalizedQuantity = toPositiveInteger(quantity);
+
   const variant = await variantDb.findVariantById(variantId);
 
   if (!variant) {
@@ -153,7 +172,7 @@ const ensureVariantCanBeAdded = async ({ variantId, quantity }) => {
     throw new BadRequestError("This variant is not available");
   }
 
-  if (variant.stock < quantity) {
+  if (Number(variant.stock) < normalizedQuantity) {
     throw new BadRequestError(
       `Insufficient stock. Available: ${variant.stock}`,
     );
@@ -162,14 +181,28 @@ const ensureVariantCanBeAdded = async ({ variantId, quantity }) => {
   return variant;
 };
 
+// ============================================================
+// GET CART
+// ============================================================
+
 export const getCart = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
 
   return formatCart(cart);
 };
 
+// ============================================================
+// ADD ITEM
+// ============================================================
+
 export const addItemToCart = async (userId, payload) => {
-  const { variantId, quantity = 1 } = payload;
+  const variantId = payload?.variantId;
+
+  if (!variantId) {
+    throw new BadRequestError("Variant ID is required");
+  }
+
+  const quantity = toPositiveInteger(payload?.quantity ?? 1);
 
   const variant = await ensureVariantCanBeAdded({
     variantId,
@@ -184,7 +217,7 @@ export const addItemToCart = async (userId, payload) => {
   });
 
   if (existingCartItem) {
-    const nextQuantity = existingCartItem.quantity + quantity;
+    const nextQuantity = Number(existingCartItem.quantity) + quantity;
 
     await ensureVariantCanBeAdded({
       variantId,
@@ -210,12 +243,12 @@ export const addItemToCart = async (userId, payload) => {
   return formatCart(updatedCart);
 };
 
-export const updateCartItem = async (userId, variantId, payload) => {
-  const { quantity } = payload;
+// ============================================================
+// UPDATE ITEM
+// ============================================================
 
-  if (quantity <= 0) {
-    throw new BadRequestError("Quantity must be greater than 0");
-  }
+export const updateCartItem = async (userId, variantId, payload) => {
+  const quantity = toPositiveInteger(payload?.quantity);
 
   await ensureVariantCanBeAdded({
     variantId,
@@ -244,6 +277,10 @@ export const updateCartItem = async (userId, variantId, payload) => {
   return formatCart(updatedCart);
 };
 
+// ============================================================
+// REMOVE ITEM
+// ============================================================
+
 export const removeCartItem = async (userId, variantId) => {
   const cart = await getOrCreateActiveCart(userId);
 
@@ -266,6 +303,10 @@ export const removeCartItem = async (userId, variantId) => {
   return formatCart(updatedCart);
 };
 
+// ============================================================
+// CLEAR CART
+// ============================================================
+
 export const clearCart = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
 
@@ -276,6 +317,10 @@ export const clearCart = async (userId) => {
   return formatCart(updatedCart);
 };
 
+// ============================================================
+// CART SUMMARY
+// ============================================================
+
 export const getCartSummary = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
 
@@ -283,13 +328,24 @@ export const getCartSummary = async (userId) => {
 
   return {
     ...formatted,
+
     shippingEstimate: null,
+
     taxEstimate: 0,
+
     grandTotal: formatted.subtotal,
   };
 };
 
+// ============================================================
+// MERGE GUEST CART
+// ============================================================
+
 export const mergeCarts = async (userId, sessionId) => {
+  if (!sessionId) {
+    return getCart(userId);
+  }
+
   const guestCart = await cartDb.findActiveCartBySessionId(sessionId);
 
   if (!guestCart) {
@@ -300,7 +356,9 @@ export const mergeCarts = async (userId, sessionId) => {
 
   await cartDb.mergeGuestCartIntoUserCart({
     guestCartId: guestCart.id,
+
     userCartId: userCart.id,
+
     items: guestCart.items,
   });
 
@@ -308,6 +366,10 @@ export const mergeCarts = async (userId, sessionId) => {
 
   return formatCart(updatedCart);
 };
+
+// ============================================================
+// CHECKOUT VALIDATION
+// ============================================================
 
 export const validateCartForCheckout = async (userId) => {
   const cart = await getOrCreateActiveCart(userId);
@@ -317,12 +379,24 @@ export const validateCartForCheckout = async (userId) => {
   }
 
   const errors = [];
+
   const items = [];
 
   for (const cartItem of cart.items) {
+    const quantity = Number(cartItem.quantity);
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      errors.push({
+        variantId: cartItem.variantId,
+        error: "Invalid cart quantity",
+      });
+
+      continue;
+    }
+
     const variant = await variantDb.findVariantById(cartItem.variantId);
 
-    if (!variant || !variant.isActive) {
+    if (!variant) {
       errors.push({
         variantId: cartItem.variantId,
         error: "Variant is no longer available",
@@ -331,29 +405,64 @@ export const validateCartForCheckout = async (userId) => {
       continue;
     }
 
-    if (variant.stock < cartItem.quantity) {
+    if (!variant.isActive) {
+      errors.push({
+        variantId: cartItem.variantId,
+        sku: variant.sku,
+        error: "Variant is no longer available",
+      });
+
+      continue;
+    }
+
+    if (Number(variant.stock) < quantity) {
       errors.push({
         variantId: cartItem.variantId,
         sku: variant.sku,
         available: variant.stock,
-        requested: cartItem.quantity,
+        requested: quantity,
         error: "Insufficient stock",
       });
     }
 
+    if (
+      cartItem.unitPriceSnapshot == null ||
+      Number(cartItem.unitPriceSnapshot) <= 0
+    ) {
+      errors.push({
+        variantId: cartItem.variantId,
+        sku: variant.sku,
+        error: "Invalid cart item price",
+      });
+
+      continue;
+    }
+
     items.push({
       variantId: cartItem.variantId,
-      quantity: cartItem.quantity,
-      price: Number(variant.price),
-      total: Number(variant.price) * cartItem.quantity,
+
+      quantity,
+
+      // The cart snapshot is the price used for
+      // this cart/order calculation.
+      price: Number(cartItem.unitPriceSnapshot),
+
+      total: Number(cartItem.unitPriceSnapshot) * quantity,
+
       variant,
     });
   }
 
   return {
     valid: errors.length === 0,
+
     errors,
+
     items,
-    totalItems: cart.items.reduce((sum, item) => sum + item.quantity, 0),
+
+    totalItems: cart.items.reduce(
+      (sum, item) => sum + Number(item.quantity),
+      0,
+    ),
   };
 };

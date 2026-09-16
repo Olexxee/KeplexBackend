@@ -99,10 +99,11 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // ── Health check ──
-app.get("/health", (req, res) => {
+app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Keplex backend is running",
+    environment: process.env.NODE_ENV,
   });
 });
 

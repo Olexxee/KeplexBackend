@@ -1,5 +1,9 @@
 import { prisma } from "../../config/prisma.js";
 
+// ============================================================
+// SHARED INCLUDES
+// ============================================================
+
 const variantMediaSelect = {
   id: true,
   url: true,
@@ -14,6 +18,7 @@ const productInclude = {
       name: true,
     },
   },
+
   category: {
     select: {
       id: true,
@@ -26,6 +31,7 @@ const variantInclude = {
   media: {
     select: variantMediaSelect,
   },
+
   product: {
     include: productInclude,
   },
@@ -59,26 +65,37 @@ const orderInclude = {
   },
 };
 
-/**
- * Generate order number
- */
+// ============================================================
+// ORDER NUMBER
+// ============================================================
+
 export const generateOrderNumber = () => {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const timestamp = Date.now()
+    .toString(36)
+    .toUpperCase();
+
+  const random = Math.random()
+    .toString(36)
+    .substring(2, 6)
+    .toUpperCase();
 
   return `KEP-${timestamp}-${random}`;
 };
 
-/**
- * CART
- */
+// ============================================================
+// CART
+// ============================================================
 
-export const findActiveCartForCheckout = (userId, tx = prisma) => {
+export const findActiveCartForCheckout = async (
+  userId,
+  tx = prisma,
+) => {
   return tx.cart.findFirst({
     where: {
       userId,
       status: "ACTIVE",
     },
+
     include: {
       items: {
         include: {
@@ -93,10 +110,10 @@ export const findActiveCartForCheckout = (userId, tx = prisma) => {
   });
 };
 
+// ============================================================
+// ORDER CREATE
+// ============================================================
 
-/**
- * ORDER CREATE
- */
 export const createOrderFromCart = async (
   {
     userId,
@@ -106,98 +123,258 @@ export const createOrderFromCart = async (
     totalAmount,
     shippingCost,
     taxAmount,
-    cbmData,
     itemsWithCBM,
   },
   tx = prisma,
 ) => {
   const subtotal = cart.items.reduce(
-    (sum, item) => sum + Number(item.unitPriceSnapshot) * item.quantity,
+    (sum, item) =>
+      sum +
+      Number(item.unitPriceSnapshot) *
+        Number(item.quantity),
     0,
   );
 
-  const totalCBM = itemsWithCBM.reduce((sum, item) => sum + item.cbm, 0);
+  const calculatedItems = Array.isArray(
+    itemsWithCBM,
+  )
+    ? itemsWithCBM
+    : [];
 
-  const totalChargeableWeight = itemsWithCBM.reduce(
-    (sum, item) => sum + item.chargeableWeight,
+  const totalCBM = calculatedItems.reduce(
+    (sum, item) =>
+      sum + Number(item.cbm || 0),
     0,
   );
+
+  const totalChargeableWeight =
+    calculatedItems.reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item.chargeableWeight || 0,
+        ),
+      0,
+    );
+
+  const normalizedCBM = Number(
+    totalCBM.toFixed(4),
+  );
+
+  const normalizedChargeableWeight =
+    Number(
+      totalChargeableWeight.toFixed(2),
+    );
 
   return tx.order.create({
     data: {
+      // ------------------------------------------------------
+      // USER
+      // ------------------------------------------------------
+
       userId,
-      orderNumber: generateOrderNumber(),
 
-      customerName: address.fullName,
-      customerEmail: address.email || null,
-      customerPhone: address.phone,
+      orderNumber:
+        generateOrderNumber(),
 
-      shippingLabel: address.label || null,
-      shippingStreet: address.addressLine,
-      shippingCity: address.city,
-      shippingState: address.state || null,
-      shippingCountry: address.country || "NG",
+      // ------------------------------------------------------
+      // CUSTOMER SNAPSHOT
+      // ------------------------------------------------------
+
+      customerName:
+        address.fullName,
+
+      customerEmail:
+        address.email || null,
+
+      customerPhone:
+        address.phone,
+
+      // ------------------------------------------------------
+      // SHIPPING ADDRESS SNAPSHOT
+      // ------------------------------------------------------
+
+      shippingLabel:
+        address.label || null,
+
+      shippingStreet:
+        address.addressLine,
+
+      shippingCity:
+        address.city,
+
+      shippingState:
+        address.state || null,
+
+      shippingCountry:
+        address.country || "NG",
+
+      // ------------------------------------------------------
+      // FINANCIALS
+      // ------------------------------------------------------
 
       subtotal,
-      shippingCost: shippingCost || 0,
-      taxAmount: taxAmount || 0,
-      totalAmount,
+
+      shippingCost:
+        Number(shippingCost || 0),
+
+      taxAmount:
+        Number(taxAmount || 0),
+
+      totalAmount:
+        Number(totalAmount),
+
+      // ------------------------------------------------------
+      // ORDER STATE
+      // ------------------------------------------------------
 
       status: "PENDING",
-      notes: payload.notes || null,
 
-      cbm: parseFloat(totalCBM.toFixed(4)),
-      chargeableWeight: parseFloat(totalChargeableWeight.toFixed(2)),
+      notes:
+        payload.notes || null,
+
+      // ------------------------------------------------------
+      // SHIPPING METRICS
+      // ------------------------------------------------------
+
+      cbm:
+        normalizedCBM,
+
+      chargeableWeight:
+        normalizedChargeableWeight,
 
       cbmData: {
-        totalCBM: parseFloat(totalCBM.toFixed(4)),
-        totalChargeableWeight: parseFloat(totalChargeableWeight.toFixed(2)),
+        totalCBM:
+          normalizedCBM,
 
-        items: itemsWithCBM.map((item) => ({
-          variantId: item.variantId,
-          sku: item.variant?.sku,
-          productName: item.variant?.product?.name,
-          quantity: item.quantity,
-          cbm: item.cbm,
-          chargeableWeight: item.chargeableWeight,
+        totalChargeableWeight:
+          normalizedChargeableWeight,
 
-          dimensions: {
-            length: item.variant?.length,
-            width: item.variant?.width,
-            height: item.variant?.height,
-          },
-        })),
+        items: calculatedItems.map(
+          (item) => ({
+            variantId:
+              item.variantId,
+
+            quantity:
+              Number(
+                item.quantity || 0,
+              ),
+
+            cbm:
+              Number(
+                item.cbm || 0,
+              ),
+
+            actualWeight:
+              Number(
+                item.actualWeight || 0,
+              ),
+
+            volumetricWeight:
+              Number(
+                item.volumetricWeight || 0,
+              ),
+
+            chargeableWeight:
+              Number(
+                item.chargeableWeight ||
+                  0,
+              ),
+
+            shippingType:
+              item.shippingType ||
+              "LOCAL",
+
+            dimensions: {
+              length:
+                item.length != null
+                  ? Number(
+                      item.length,
+                    )
+                  : null,
+
+              width:
+                item.width != null
+                  ? Number(
+                      item.width,
+                    )
+                  : null,
+
+              height:
+                item.height != null
+                  ? Number(
+                      item.height,
+                    )
+                  : null,
+            },
+          }),
+        ),
       },
 
-      fulfillmentGroups: payload.fulfillmentGroups || null,
+      // ------------------------------------------------------
+      // FULFILLMENT GROUPS
+      // ------------------------------------------------------
+
+      fulfillmentGroups:
+        payload.fulfillmentGroups ||
+        null,
+
+      // ------------------------------------------------------
+      // ORDER ITEMS
+      // ------------------------------------------------------
 
       items: {
-        create: cart.items.map((cartItem) => {
-          const itemCBM = itemsWithCBM.find(
-            (item) => item.variantId === cartItem.variantId,
-          );
+        create: cart.items.map(
+          (cartItem) => {
+            const itemCBM =
+              calculatedItems.find(
+                (item) =>
+                  item.variantId ===
+                  cartItem.variantId,
+              );
 
-          return {
-            variantId: cartItem.variantId,
-            quantity: cartItem.quantity,
-            unitPriceSnapshot: cartItem.unitPriceSnapshot,
+            return {
+              variantId:
+                cartItem.variantId,
 
-            totalPrice: Number(cartItem.unitPriceSnapshot) * cartItem.quantity,
+              quantity:
+                Number(
+                  cartItem.quantity,
+                ),
 
-            cbm: itemCBM?.cbm || 0,
-            chargeableWeight: itemCBM?.chargeableWeight || 0,
-          };
-        }),
+              unitPriceSnapshot:
+                cartItem.unitPriceSnapshot,
+
+              totalPrice:
+                Number(
+                  cartItem.unitPriceSnapshot,
+                ) *
+                Number(
+                  cartItem.quantity,
+                ),
+
+              cbm:
+                Number(
+                  itemCBM?.cbm || 0,
+                ),
+
+              chargeableWeight:
+                Number(
+                  itemCBM?.chargeableWeight ||
+                    0,
+                ),
+            };
+          },
+        ),
       },
     },
-
-    include: orderInclude,
   });
 };
 
-/**
- * ORDERS LIST
- */
+// ============================================================
+// ORDERS LIST
+// ============================================================
+
 export const findOrders = async ({
   status,
   userId,
@@ -208,8 +385,13 @@ export const findOrders = async ({
   take = 20,
 } = {}) => {
   const where = {
-    ...(status && { status }),
-    ...(userId && { userId }),
+    ...(status && {
+      status,
+    }),
+
+    ...(userId && {
+      userId,
+    }),
 
     ...(search && {
       OR: [
@@ -219,18 +401,21 @@ export const findOrders = async ({
             mode: "insensitive",
           },
         },
+
         {
           customerName: {
             contains: search,
             mode: "insensitive",
           },
         },
+
         {
           customerEmail: {
             contains: search,
             mode: "insensitive",
           },
         },
+
         {
           customerPhone: {
             contains: search,
@@ -263,7 +448,8 @@ export const findOrders = async ({
             variant: {
               include: {
                 media: {
-                  select: variantMediaSelect,
+                  select:
+                    variantMediaSelect,
                 },
 
                 product: {
@@ -318,32 +504,46 @@ export const findOrders = async ({
   ]);
 };
 
-/**
- * SINGLE ORDER
- */
-export const findOrderById = async (id, tx = prisma) => {
+// ============================================================
+// SINGLE ORDER
+// ============================================================
+
+export const findOrderById = async (
+  id,
+  tx = prisma,
+) => {
   return tx.order.findUnique({
     where: {
       id,
     },
+
     include: orderInclude,
   });
 };
 
-export const findOrderByOrderNumber = async (orderNumber) => {
-  return prisma.order.findUnique({
+export const findOrderByOrderNumber = async (
+  orderNumber,
+  tx = prisma,
+) => {
+  return tx.order.findUnique({
     where: {
       orderNumber,
     },
+
     include: orderInclude,
   });
 };
 
-/**
- * ORDER STATUS
- */
-export const updateOrderStatus = async (id, status) => {
-  return prisma.order.update({
+// ============================================================
+// ORDER STATUS
+// ============================================================
+
+export const updateOrderStatus = async (
+  id,
+  status,
+  tx = prisma,
+) => {
+  return tx.order.update({
     where: {
       id,
     },
@@ -356,16 +556,37 @@ export const updateOrderStatus = async (id, status) => {
   });
 };
 
-/**
- * STOCK OPERATIONS
- */
+export const updateOrderStatusTx = async (
+  id,
+  data,
+  tx = prisma,
+) => {
+  return tx.order.update({
+    where: {
+      id,
+    },
+
+    data,
+
+    include: orderInclude,
+  });
+};
+
+// ============================================================
+// STOCK
+// ============================================================
+
 export const decrementVariantStock = async (
-  { variantId, quantity },
+  {
+    variantId,
+    quantity,
+  },
   tx = prisma,
 ) => {
   return tx.productVariant.updateMany({
     where: {
       id: variantId,
+
       stock: {
         gte: quantity,
       },
@@ -380,7 +601,10 @@ export const decrementVariantStock = async (
 };
 
 export const restoreOrderItemStock = async (
-  { variantId, quantity },
+  {
+    variantId,
+    quantity,
+  },
   tx = prisma,
 ) => {
   return tx.productVariant.update({
@@ -396,25 +620,15 @@ export const restoreOrderItemStock = async (
   });
 };
 
-/**
- * TRANSACTIONAL ORDER UPDATE
- */
-export const updateOrderStatusTx = async (id, data, tx = prisma) => {
-  return tx.order.update({
-    where: {
-      id,
-    },
+// ============================================================
+// ORDER CBM
+// ============================================================
 
-    data,
-
-    include: orderInclude,
-  });
-};
-
-/**
- * ORDER CBM UPDATE
- */
-export const updateOrderCBM = async (id, data, tx = prisma) => {
+export const updateOrderCBM = async (
+  id,
+  data,
+  tx = prisma,
+) => {
   return tx.order.update({
     where: {
       id,
@@ -422,19 +636,30 @@ export const updateOrderCBM = async (id, data, tx = prisma) => {
 
     data: {
       cbm: data.cbm,
-      chargeableWeight: data.chargeableWeight,
-      cbmData: data.cbmData,
-      cbmUpdatedAt: data.cbmUpdatedAt || new Date(),
-      cbmUpdatedBy: data.cbmUpdatedBy,
+
+      chargeableWeight:
+        data.chargeableWeight,
+
+      cbmData:
+        data.cbmData,
+
+      cbmUpdatedAt:
+        data.cbmUpdatedAt ||
+        new Date(),
+
+      cbmUpdatedBy:
+        data.cbmUpdatedBy ||
+        null,
     },
 
     include: orderInclude,
   });
 };
 
-/**
- * ORDER METRICS
- */
+// ============================================================
+// ORDER METRICS
+// ============================================================
+
 export const getOrderMetrics = async () => {
   const [
     totalOrders,
@@ -485,7 +710,14 @@ export const getOrderMetrics = async () => {
     prisma.order.count({
       where: {
         createdAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          gte: new Date(
+            new Date().setHours(
+              0,
+              0,
+              0,
+              0,
+            ),
+          ),
         },
       },
     }),
@@ -495,7 +727,14 @@ export const getOrderMetrics = async () => {
         status: "COMPLETED",
 
         createdAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          gte: new Date(
+            new Date().setHours(
+              0,
+              0,
+              0,
+              0,
+            ),
+          ),
         },
       },
 
@@ -507,24 +746,36 @@ export const getOrderMetrics = async () => {
 
   return {
     totalOrders,
+
     pendingOrders,
+
     processingOrders,
+
     completedOrders,
+
     cancelledOrders,
 
-    totalRevenue: totalRevenue._sum.totalAmount || 0,
+    totalRevenue:
+      totalRevenue._sum.totalAmount ||
+      0,
 
     todayOrders,
 
-    todayRevenue: todayRevenue._sum.totalAmount || 0,
+    todayRevenue:
+      todayRevenue._sum.totalAmount ||
+      0,
   };
 };
 
-/**
- * ORDER TIMELINE - AUDIT LOGS
- */
-export const findOrderAuditLogs = async (orderId) => {
-  return prisma.auditLog.findMany({
+// ============================================================
+// ORDER TIMELINE - AUDIT
+// ============================================================
+
+export const findOrderAuditLogs = async (
+  orderId,
+  tx = prisma,
+) => {
+  return tx.auditLog.findMany({
     where: {
       entity: "Order",
       entityId: orderId,
@@ -537,11 +788,15 @@ export const findOrderAuditLogs = async (orderId) => {
   });
 };
 
-/**
- * ORDER TIMELINE - PAYMENTS
- */
-export const findOrderPayments = async (orderId) => {
-  return prisma.payment.findMany({
+// ============================================================
+// ORDER TIMELINE - PAYMENTS
+// ============================================================
+
+export const findOrderPayments = async (
+  orderId,
+  tx = prisma,
+) => {
+  return tx.payment.findMany({
     where: {
       orderId,
     },
@@ -552,11 +807,15 @@ export const findOrderPayments = async (orderId) => {
   });
 };
 
-/**
- * ORDER TIMELINE - FULFILLMENTS
- */
-export const findOrderFulfillments = async (orderId) => {
-  return prisma.fulfillment.findMany({
+// ============================================================
+// ORDER TIMELINE - FULFILLMENTS
+// ============================================================
+
+export const findOrderFulfillments = async (
+  orderId,
+  tx = prisma,
+) => {
+  return tx.fulfillment.findMany({
     where: {
       orderId,
     },
@@ -571,47 +830,44 @@ export const findOrderFulfillments = async (orderId) => {
   });
 };
 
-/**
- * ORDERS BY FULFILLMENT TYPE
- */
-export const findOrdersByFulfillmentType = async (fulfillmentType) => {
-  return prisma.order.findMany({
-    where: {
-      fulfillmentGroups: {
-        path: "$.types",
-        array_contains: fulfillmentType,
+// ============================================================
+// ORDERS BY FULFILLMENT TYPE
+// ============================================================
+
+export const findOrdersByFulfillmentType =
+  async (
+    fulfillmentType,
+    tx = prisma,
+  ) => {
+    return tx.order.findMany({
+      where: {
+        fulfillmentGroups: {
+          path: "$.types",
+          array_contains: fulfillmentType,
+        },
       },
-    },
 
-    include: {
-      items: {
-        include: {
-          variant: {
-            include: {
-              media: {
-                select: variantMediaSelect,
+      include: {
+        items: {
+          include: {
+            variant: {
+              include: {
+                media: {
+                  select:
+                    variantMediaSelect,
+                },
+
+                product: true,
               },
-
-              product: true,
             },
           },
         },
-      },
 
-      fulfillments: {
-        where: {
-          type: fulfillmentType,
+        fulfillments: {
+          where: {
+            type: fulfillmentType,
+          },
         },
       },
-    },
-  });
-};
-
-/**
- * CREATE AUDIT LOG
- */
-export const createAuditLog = async (data, tx = prisma) => {
-  return tx.auditLog.create({
-    data,
-  });
-};
+    });
+  };

@@ -1,85 +1,226 @@
-// modules/shipping/shipping.controller.js
-import { asyncWrapper } from "../../lib/asyncWrapper.js";
-import { successResponse } from "../../lib/response.js";
 import * as shippingService from "./shipping.service.js";
-import * as cartDb from "../cart/cart.db.js";
 
-export const createShippingConfig = asyncWrapper(async (req, res) => {
-  const config = await shippingService.createShippingConfig(req.body);
+// ============================================================
+// CONFIGURATION
+// ============================================================
 
-  return successResponse({
-    res,
-    statusCode: 201,
-    message: "Shipping configuration created",
+export const createShippingConfig = async (
+  req,
+  res,
+) => {
+  const config =
+    await shippingService.createShippingConfig(
+      req.body,
+    );
+
+  res.status(201).json({
+    success: true,
+    message:
+      "Shipping configuration created successfully",
     data: config,
   });
-});
+};
 
-export const updateShippingConfig = asyncWrapper(async (req, res) => {
-  const config = await shippingService.updateShippingConfig(
-    req.params.id,
-    req.body,
-  );
+export const updateShippingConfig = async (
+  req,
+  res,
+) => {
+  const config =
+    await shippingService.updateShippingConfig(
+      req.params.id,
+      req.body,
+    );
 
-  return successResponse({
-    res,
-    message: "Shipping configuration updated",
+  res.json({
+    success: true,
+    message:
+      "Shipping configuration updated successfully",
     data: config,
   });
-});
+};
 
-export const getShippingConfigs = asyncWrapper(async (req, res) => {
-  const configs = await shippingService.getShippingConfigs(req.query);
+export const getShippingConfig = async (
+  req,
+  res,
+) => {
+  const config =
+    await shippingService.getShippingConfig(
+      req.params.id,
+    );
 
-  return successResponse({
-    res,
-    message: "Shipping configurations fetched",
+  res.json({
+    success: true,
+    data: config,
+  });
+};
+
+export const getShippingConfigs = async (
+  req,
+  res,
+) => {
+  const configs =
+    await shippingService.getShippingConfigs();
+
+  res.json({
+    success: true,
     data: configs,
   });
-});
+};
 
-export const calculateCartShipping = asyncWrapper(async (req, res) => {
-  const cart = await cartDb.findActiveCartByUserId(req.user.id);
-  if (!cart || cart.items.length === 0) {
-    return successResponse({
-      res,
-      data: {
-        shippingCosts: null,
-        message: "Cart is empty",
-      },
-    });
-  }
+export const getActiveShippingConfig = async (
+  req,
+  res,
+) => {
+  const config =
+    await shippingService.getActiveShippingConfig();
 
-  const shipping = await shippingService.calculateShippingForCart(cart.items);
-
-  return successResponse({
-    res,
-    message: "Shipping calculated",
-    data: shipping,
+  res.json({
+    success: true,
+    data: config,
   });
-});
+};
 
-export const calculateVariantCBM = asyncWrapper(async (req, res) => {
-  const cbmData = await shippingService.calculateCBMForVariant(
-    req.params.variantId,
+// ============================================================
+// RULES
+// ============================================================
+
+export const createShippingRule = async (
+  req,
+  res,
+) => {
+  const rule =
+    await shippingService.createShippingRule(
+      req.body,
+    );
+
+  res.status(201).json({
+    success: true,
+    message:
+      "Shipping rule created successfully",
+    data: rule,
+  });
+};
+
+export const updateShippingRule = async (
+  req,
+  res,
+) => {
+  const rule =
+    await shippingService.updateShippingRule(
+      req.params.id,
+      req.body,
+    );
+
+  res.json({
+    success: true,
+    message:
+      "Shipping rule updated successfully",
+    data: rule,
+  });
+};
+
+export const getShippingRule = async (
+  req,
+  res,
+) => {
+  const rule =
+    await shippingService.getShippingRule(
+      req.params.id,
+    );
+
+  res.json({
+    success: true,
+    data: rule,
+  });
+};
+
+export const getShippingRules = async (
+  req,
+  res,
+) => {
+  const rules =
+    await shippingService.getShippingRules(
+      req.query,
+    );
+
+  res.json({
+    success: true,
+    data: rules,
+  });
+};
+
+export const deleteShippingRule = async (
+  req,
+  res,
+) => {
+  await shippingService.deleteShippingRule(
+    req.params.id,
   );
 
-  return successResponse({
-    res,
-    message: "CBM calculated",
-    data: cbmData,
+  res.json({
+    success: true,
+    message:
+      "Shipping rule deleted successfully",
   });
-});
+};
 
-export const updateOrderCBM = asyncWrapper(async (req, res) => {
-  const { orderId } = req.params;
-  const cbmData = req.body;
+// ============================================================
+// QUOTE
+// ============================================================
 
-  const order = await shippingService.updateOrderWithCBM(orderId, cbmData);
+export const calculateShippingQuote = async (
+  req,
+  res,
+) => {
+  const quote =
+    await shippingService.calculateShippingQuote(
+      req.body,
+    );
 
-  return successResponse({
-    res,
-    message: "Order CBM updated",
-    data: order,
+  res.json({
+    success: true,
+    data: quote,
   });
-});
+};
+
+// ============================================================
+// VARIANT CBM
+// ============================================================
+
+export const calculateCBMForVariant = async (
+  req,
+  res,
+) => {
+  const result =
+    shippingService.calculateCBMForVariant(
+      req.body,
+    );
+
+  res.json({
+    success: true,
+    data: result,
+  });
+};
+
+// ============================================================
+// ORDER CBM
+// ============================================================
+
+export const updateOrderWithCBM = async (
+  req,
+  res,
+) => {
+  const result =
+    await shippingService.updateOrderWithCBM({
+      orderId: req.body.orderId,
+      items: req.body.items,
+      updatedBy: req.user?.id || null,
+    });
+
+  res.json({
+    success: true,
+    message:
+      "Order shipping metrics updated successfully",
+    data: result,
+  });
+};

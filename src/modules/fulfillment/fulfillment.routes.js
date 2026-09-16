@@ -1,106 +1,98 @@
-// modules/fulfillment/fulfillment.routes.js
 import { Router } from "express";
-import { authMiddleware } from "../../middlewares/authMiddleware.js";
-import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
-import {
-  validateBody,
-  validateParams,
-  validateQuery,
-} from "../../middlewares/validateMiddleware.js";
+
 import * as fulfillmentController from "./fulfillment.controller.js";
-import {
-  updateFulfillmentStatusSchema,
-  updateFulfillmentTrackingSchema,
-  fulfillmentIdSchema,
-  orderIdSchema,
-  getFulfillmentsQuerySchema,
-  createWarehouseSchema,
-  updateWarehouseSchema,
-  warehouseIdSchema,
-  getWarehousesQuerySchema,
-} from "./fulfillment.validation.js";
 
-const fulfillmentRouter = Router();
+import { authenticate } from "../../middleware/auth.middleware.js";
+import { authorizeRoles } from "../../middleware/role.middleware.js";
 
-// All fulfillment routes require admin access
-fulfillmentRouter.use(authMiddleware);
-fulfillmentRouter.use(roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"));
+const router = Router();
 
-// Fulfillment routes
-fulfillmentRouter.get(
+router.use(authenticate);
+
+// ============================================================
+// FULFILLMENTS
+// ============================================================
+
+router.get(
   "/",
-  validateQuery(getFulfillmentsQuerySchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
   fulfillmentController.getFulfillments,
 );
 
-fulfillmentRouter.get(
+router.get(
   "/order/:orderId",
-  validateParams(orderIdSchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
   fulfillmentController.getFulfillmentsByOrder,
 );
 
-fulfillmentRouter.get(
-  "/:id",
-  validateParams(fulfillmentIdSchema),
-  fulfillmentController.getFulfillmentById,
-);
-
-fulfillmentRouter.patch(
-  "/:id/status",
-  validateParams(fulfillmentIdSchema),
-  validateBody(updateFulfillmentStatusSchema),
-  fulfillmentController.updateFulfillmentStatus,
-);
-
-fulfillmentRouter.patch(
-  "/:id/tracking",
-  validateParams(fulfillmentIdSchema),
-  validateBody(updateFulfillmentTrackingSchema),
-  fulfillmentController.updateFulfillmentTracking,
-);
-
-fulfillmentRouter.post(
+router.post(
   "/order/:orderId/generate",
-  validateParams(orderIdSchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
   fulfillmentController.createFulfillmentsForOrder,
 );
 
-fulfillmentRouter.delete(
+router.patch(
+  "/:id/status",
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
+  fulfillmentController.updateFulfillmentStatus,
+);
+
+router.patch(
+  "/:id/tracking",
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
+  fulfillmentController.updateFulfillmentTracking,
+);
+
+router.delete(
   "/:id",
-  validateParams(fulfillmentIdSchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN"),
   fulfillmentController.deleteFulfillment,
 );
 
-// Warehouse routes
-fulfillmentRouter.get(
+// ============================================================
+// WAREHOUSES
+// IMPORTANT: these MUST appear before "/:id"
+// ============================================================
+
+router.get(
   "/warehouses",
-  validateQuery(getWarehousesQuerySchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
   fulfillmentController.getWarehouses,
 );
 
-fulfillmentRouter.get(
+router.get(
   "/warehouses/:id",
-  validateParams(warehouseIdSchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
   fulfillmentController.getWarehouseById,
 );
 
-fulfillmentRouter.post(
+router.post(
   "/warehouses",
-  validateBody(createWarehouseSchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN"),
   fulfillmentController.createWarehouse,
 );
 
-fulfillmentRouter.patch(
+router.patch(
   "/warehouses/:id",
-  validateParams(warehouseIdSchema),
-  validateBody(updateWarehouseSchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN"),
   fulfillmentController.updateWarehouse,
 );
 
-fulfillmentRouter.delete(
+router.delete(
   "/warehouses/:id",
-  validateParams(warehouseIdSchema),
+  authorizeRoles("SUPER_ADMIN", "ADMIN"),
   fulfillmentController.deleteWarehouse,
 );
 
-export default fulfillmentRouter;
+// ============================================================
+// DYNAMIC FULFILLMENT ID
+// MUST COME AFTER STATIC ROUTES
+// ============================================================
+
+router.get(
+  "/:id",
+  authorizeRoles("SUPER_ADMIN", "ADMIN", "STAFF"),
+  fulfillmentController.getFulfillmentById,
+);
+
+export default router;

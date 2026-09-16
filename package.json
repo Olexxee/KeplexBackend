@@ -8,7 +8,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:deploy": "npm run prisma:generate && npm run prisma:migrate:deploy",
     "start": "node src/server.js",
-    "dev": "npm run prisma:generate && nodemon src/server.js"
+    "dev": "npm run prisma:generate && nodemon src/server.js",
+    "worker": "node src/jobs/workers/index.js"
   },
   "keywords": [],
   "author": "",
