@@ -54,18 +54,23 @@ export const findActiveWarehouseByType = async (type, tx) => {
 };
 
 export const findWarehouses = async ({ type, isActive } = {}, tx) => {
-  return dbClient(tx).warehouse.findMany({
+  console.log("5. WAREHOUSE DB HIT");
+  console.log("filters:", { type, isActive });
+
+  const result = await dbClient(tx).warehouse.findMany({
     where: {
       ...(type ? { type } : {}),
       ...(typeof isActive === "boolean" ? { isActive } : {}),
     },
-    orderBy: [
-      {
-        createdAt: "desc",
-      },
-    ],
+    orderBy: {
+      createdAt: "desc",
+    },
     select: warehouseSelect,
   });
+
+  console.log("6. PRISMA RETURNED");
+
+  return result;
 };
 
 // ============================================================

@@ -1,9 +1,12 @@
 import { prisma } from "../../config/prisma.js";
+
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
 
 import * as auditService from "../audit/audit.service.js";
 import * as fulfillmentDb from "./fulfillment.db.js";
+import * as warehouseDb from "../warehouse/warehouse.db.js";
 import * as orderDb from "../order/order.db.js";
+
 import { orderSplitter } from "./order.splitter.js";
 
 // ============================================================
@@ -54,14 +57,6 @@ export const getFulfillmentsByOrder = async (orderId) => {
 // PREPARE FULFILLMENT PLAN
 // ============================================================
 
-/**
- * Pure preparation phase.
- *
- * No transaction is opened here.
- *
- * Warehouse lookups happen before checkout's critical
- * transaction so they cannot consume transaction time.
- */
 export const prepareFulfillmentPlan = async (fulfillmentGroups = {}) => {
   const plan = [];
 
@@ -70,7 +65,17 @@ export const prepareFulfillmentPlan = async (fulfillmentGroups = {}) => {
       continue;
     }
 
-    const warehouse = await orderSplitter.assignWarehouse(type);
+    let warehouse = null;
+
+    if (type !== "DIGITAL") {
+      warehouse = await warehouseDb.findActiveWarehouseByType(type);
+
+      if (!warehouse) {
+        throw new BadRequestError(
+          `No active warehouse configured for fulfillment type: ${type}`,
+        );
+      }
+    }
 
     plan.push({
       type,
@@ -91,22 +96,60 @@ export const prepareFulfillmentPlan = async (fulfillmentGroups = {}) => {
 };
 
 // ============================================================
+// GENERATE FULFILLMENTS FOR ORDER
+// ============================================================
+
+export const generateFulfillmentsForOrder = async (
+  orderId,
+) => {
+  const order = await orderDb.findOrderById(
+    orderId,
+  );
+
+  if (!order) {
+    throw new NotFoundError("Order not found");
+  }
+
+  if (!order.items?.length) {
+    throw new BadRequestError(
+      "Cannot generate fulfillments for an order with no items",
+    );
+  }
+
+  const existingFulfillments =
+    await fulfillmentDb.findFulfillmentsByOrderId(
+      orderId,
+    );
+
+  if (existingFulfillments.length > 0) {
+    throw new BadRequestError(
+      "Fulfillments have already been generated for this order",
+    );
+  }
+
+  const groups =
+    orderSplitter.splitOrderByFulfillment(
+      order.items,
+    );
+
+  const fulfillmentPlan =
+    await prepareFulfillmentPlan(groups);
+
+  return prisma.$transaction(
+    async (tx) => {
+      return createFulfillmentsForOrder({
+        orderId,
+        fulfillmentPlan,
+        tx,
+      });
+    },
+  );
+};
+
+// ============================================================
 // CREATE FULFILLMENTS
 // ============================================================
 
-/**
- * Persists a previously prepared fulfillment plan.
- *
- * This function is intentionally transaction-only.
- *
- * It does not:
- * - load the order
- * - query warehouses
- * - split the order
- * - perform shipping calculations
- *
- * Those operations belong to the preparation phase.
- */
 export const createFulfillmentsForOrder = async ({
   orderId,
   fulfillmentPlan = [],
@@ -189,6 +232,7 @@ export const updateFulfillmentStatus = async (
           action: "FULFILLMENT_STATUS_UPDATED",
           entity: "FULFILLMENT",
           entityId: id,
+
           metadata: {
             from: fulfillment.status,
             to: nextStatus,
@@ -279,11 +323,17 @@ const updateOrderStatusFromFulfillments = async (orderId, tx) => {
 
   const validTransitions = {
     PENDING: ["CONFIRMED", "CANCELLED"],
+
     CONFIRMED: ["PROCESSING", "CANCELLED"],
+
     PROCESSING: ["SHIPPED", "CANCELLED"],
+
     SHIPPED: ["DELIVERED", "CANCELLED"],
+
     DELIVERED: ["COMPLETED"],
+
     COMPLETED: [],
+
     CANCELLED: [],
   };
 
@@ -326,46 +376,4 @@ export const deleteFulfillment = async (id) => {
 
     return fulfillmentDb.deleteFulfillment(id, tx);
   });
-};
-
-// ============================================================
-// WAREHOUSES
-// ============================================================
-
-export const getWarehouses = async (query = {}) => {
-  return fulfillmentDb.findWarehouses(query);
-};
-
-export const getWarehouseById = async (id) => {
-  const warehouse = await fulfillmentDb.findWarehouseById(id);
-
-  if (!warehouse) {
-    throw new NotFoundError("Warehouse not found");
-  }
-
-  return warehouse;
-};
-
-export const createWarehouse = async (data) => {
-  return fulfillmentDb.createWarehouse(data);
-};
-
-export const updateWarehouse = async (id, data) => {
-  const warehouse = await fulfillmentDb.findWarehouseById(id);
-
-  if (!warehouse) {
-    throw new NotFoundError("Warehouse not found");
-  }
-
-  return fulfillmentDb.updateWarehouse(id, data);
-};
-
-export const deleteWarehouse = async (id) => {
-  const warehouse = await fulfillmentDb.findWarehouseById(id);
-
-  if (!warehouse) {
-    throw new NotFoundError("Warehouse not found");
-  }
-
-  return fulfillmentDb.deleteWarehouse(id);
 };

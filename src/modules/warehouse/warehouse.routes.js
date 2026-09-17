@@ -11,21 +11,19 @@ import {
   warehouseIdSchema,
   createWarehouseSchema,
   updateWarehouseSchema,
+  warehouseQuerySchema,
 } from "./warehouse.validation.js";
+
 
 const warehouseRouter = Router();
 
-warehouseRouter.use(authMiddleware, roleMiddleware);
+warehouseRouter.use(authMiddleware, roleMiddleware("ADMIN", "SUPER_ADMIN"));
 
 // ============================================================
 // READ
 // ============================================================
 
-warehouseRouter.get(
-  "/",
-  validateQuery(createWarehouseSchema),
-  warehouseController.getWarehouses,
-);
+warehouseRouter.get("/", warehouseController.getWarehouses);
 
 warehouseRouter.get(
   "/:id",
@@ -33,19 +31,11 @@ warehouseRouter.get(
   warehouseController.getWarehouseById,
 );
 
-// ============================================================
-// CREATE
-// ============================================================
-
 warehouseRouter.post(
   "/",
   validateBody(createWarehouseSchema),
   warehouseController.createWarehouse,
 );
-
-// ============================================================
-// UPDATE
-// ============================================================
 
 warehouseRouter.patch(
   "/:id",
@@ -53,10 +43,6 @@ warehouseRouter.patch(
   validateBody(updateWarehouseSchema),
   warehouseController.updateWarehouse,
 );
-
-// ============================================================
-// STATUS
-// ============================================================
 
 warehouseRouter.patch(
   "/:id/activate",
@@ -69,10 +55,6 @@ warehouseRouter.patch(
   validateParams(warehouseIdSchema),
   warehouseController.deactivateWarehouse,
 );
-
-// ============================================================
-// DELETE
-// ============================================================
 
 warehouseRouter.delete(
   "/:id",
