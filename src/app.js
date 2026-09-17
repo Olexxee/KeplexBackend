@@ -12,6 +12,7 @@ import webhookRouter from "./webhook/webhook.routes.js";
 import collectionRouter from "./modules/collections/collection.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
+import fulfillmentRouter from "./modules/fulfillment/fulfillment.routes.js"
 import notificationRouter from "./modules/notifications/notification.routes.js";
 import categoryRouter from "./modules/categories/category.routes.js";
 import configRouter from "./modules/business-config/businessConfig.routes.js";
@@ -114,6 +115,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/organisation", organisationRouter);
 app.use("/api/category", categoryRouter);
 app.use("/api/cart", cartRouter);
+app.use("/api/fulfillments", fulfillmentRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/dashboard", dashboardRouter);

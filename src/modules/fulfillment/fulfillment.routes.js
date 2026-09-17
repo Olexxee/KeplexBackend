@@ -21,7 +21,7 @@ import {
 
 const fulfillmentRouter = Router();
 
-fulfillmentRouter.use(authMiddleware, roleMiddleware);
+fulfillmentRouter.use(authMiddleware, roleMiddleware("ADMIN", "SUPER_ADMIN"));
 
 // ============================================================
 // FULFILLMENTS
