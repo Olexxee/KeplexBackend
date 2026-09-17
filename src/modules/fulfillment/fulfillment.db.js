@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 
 // ============================================================
-// SHARED INCLUDES
+// SHARED INCLUDE
 // ============================================================
 
 const fulfillmentInclude = {
@@ -55,20 +55,14 @@ const fulfillmentInclude = {
 // FULFILLMENTS
 // ============================================================
 
-export const createFulfillment = async (
-  data,
-  tx = prisma,
-) => {
+export const createFulfillment = async (data, tx = prisma) => {
   return tx.fulfillment.create({
     data,
     include: fulfillmentInclude,
   });
 };
 
-export const findFulfillmentById = async (
-  id,
-  tx = prisma,
-) => {
+export const findFulfillmentById = async (id, tx = prisma) => {
   return tx.fulfillment.findUnique({
     where: {
       id,
@@ -77,17 +71,12 @@ export const findFulfillmentById = async (
   });
 };
 
-export const findFulfillmentsByOrderId = async (
-  orderId,
-  tx = prisma,
-) => {
+export const findFulfillmentsByOrderId = async (orderId, tx = prisma) => {
   return tx.fulfillment.findMany({
     where: {
       orderId,
     },
-
     include: fulfillmentInclude,
-
     orderBy: {
       createdAt: "asc",
     },
@@ -95,16 +84,14 @@ export const findFulfillmentsByOrderId = async (
 };
 
 export const findFulfillments = async (
-  {
-    type,
-    status,
-    warehouseId,
-    page = 1,
-    limit = 20,
-  } = {},
+  { orderId, type, status, warehouseId, page = 1, limit = 20 } = {},
   tx = prisma,
 ) => {
   const where = {};
+
+  if (orderId) {
+    where.orderId = orderId;
+  }
 
   if (type) {
     where.type = type;
@@ -120,23 +107,22 @@ export const findFulfillments = async (
 
   const skip = (page - 1) * limit;
 
-  const [fulfillments, total] =
-    await Promise.all([
-      tx.fulfillment.findMany({
-        where,
-        skip,
-        take: limit,
-        include: fulfillmentInclude,
+  const [fulfillments, total] = await Promise.all([
+    tx.fulfillment.findMany({
+      where,
+      skip,
+      take: limit,
+      include: fulfillmentInclude,
 
-        orderBy: {
-          createdAt: "desc",
-        },
-      }),
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
 
-      tx.fulfillment.count({
-        where,
-      }),
-    ]);
+    tx.fulfillment.count({
+      where,
+    }),
+  ]);
 
   return {
     fulfillments,
@@ -145,18 +131,12 @@ export const findFulfillments = async (
       page,
       limit,
       total,
-      totalPages: Math.ceil(
-        total / limit,
-      ),
+      totalPages: Math.ceil(total / limit),
     },
   };
 };
 
-export const updateFulfillment = async (
-  id,
-  data,
-  tx = prisma,
-) => {
+export const updateFulfillment = async (id, data, tx = prisma) => {
   return tx.fulfillment.update({
     where: {
       id,
@@ -168,11 +148,7 @@ export const updateFulfillment = async (
   });
 };
 
-export const updateFulfillmentStatus = async (
-  id,
-  status,
-  tx = prisma,
-) => {
+export const updateFulfillmentStatus = async (id, status, tx = prisma) => {
   return tx.fulfillment.update({
     where: {
       id,
@@ -186,11 +162,7 @@ export const updateFulfillmentStatus = async (
   });
 };
 
-export const updateFulfillmentTracking = async (
-  id,
-  data,
-  tx = prisma,
-) => {
+export const updateFulfillmentTracking = async (id, data, tx = prisma) => {
   return tx.fulfillment.update({
     where: {
       id,
@@ -202,120 +174,8 @@ export const updateFulfillmentTracking = async (
   });
 };
 
-export const deleteFulfillment = async (
-  id,
-  tx = prisma,
-) => {
+export const deleteFulfillment = async (id, tx = prisma) => {
   return tx.fulfillment.delete({
-    where: {
-      id,
-    },
-  });
-};
-
-// ============================================================
-// WAREHOUSES
-// ============================================================
-
-export const findWarehouses = async (
-  {
-    type,
-    isActive,
-  } = {},
-  tx = prisma,
-) => {
-  const where = {};
-
-  if (type) {
-    where.type = type;
-  }
-
-  if (typeof isActive === "boolean") {
-    where.isActive = isActive;
-  }
-
-  return tx.warehouse.findMany({
-    where,
-
-    orderBy: [
-      {
-        isActive: "desc",
-      },
-      {
-        name: "asc",
-      },
-    ],
-  });
-};
-
-export const findWarehouseById = async (
-  id,
-  tx = prisma,
-) => {
-  return tx.warehouse.findUnique({
-    where: {
-      id,
-    },
-  });
-};
-
-export const findActiveWarehouseByType = async (
-  type,
-  tx = prisma,
-) => {
-  return tx.warehouse.findFirst({
-    where: {
-      type,
-      isActive: true,
-    },
-
-    orderBy: {
-      name: "asc",
-    },
-  });
-};
-
-export const createWarehouse = async (
-  data,
-  tx = prisma,
-) => {
-  return tx.warehouse.create({
-    data,
-  });
-};
-
-export const updateWarehouse = async (
-  id,
-  data,
-  tx = prisma,
-) => {
-  return tx.warehouse.update({
-    where: {
-      id,
-    },
-
-    data,
-  });
-};
-
-export const deleteWarehouse = async (
-  id,
-  tx = prisma,
-) => {
-  const fulfillmentCount =
-    await tx.fulfillment.count({
-      where: {
-        warehouseId: id,
-      },
-    });
-
-  if (fulfillmentCount > 0) {
-    throw new Error(
-      "Cannot delete a warehouse that has fulfillment history",
-    );
-  }
-
-  return tx.warehouse.delete({
     where: {
       id,
     },

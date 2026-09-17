@@ -24,8 +24,10 @@ import trainingRouter from "./modules/training-programs/trainingProgram.routes.j
 import registrationRouter from "./modules/registration/registration.routes.js";
 import auditRouter from "./modules/audit/audit.routes.js";
 import productRouter from "./modules/products/product.routes.js";
+import shippingRouter from "./modules/shipping/shipping.routes.js"
 import reviewRouter from "./modules/reviews/review.routes.js";
 import wishlistRouter from "./modules/wishlist/wishlist.routes.js";
+import warehouseRouter from "./modules/warehouse/warehouse.routes.js";
 import storefrontRouter from "./modules/storefront/storefront.router.js";
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
@@ -127,12 +129,14 @@ app.use("/api/notifications", notificationRouter);
 app.use("/api/testimonial", testimonialRouter);
 app.use("/api/products", productRouter);
 app.use("/api/reviews", reviewRouter);
+app.use("/api/shipping", shippingRouter);
+app.use("/api/warehouses", warehouseRouter)
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/storefront", storefrontRouter);
+
 // ── 404 handler ──
 app.use((req, res, next) => {
   next(new NotFoundError(`Route not found: ${req.originalUrl}`));
 });
 
-// ── Error middleware — must be last ──
 app.use(errorMiddleware);

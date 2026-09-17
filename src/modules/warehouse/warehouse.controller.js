@@ -9,8 +9,13 @@ import { successResponse } from "../../lib/response.js";
 export const getWarehouses = asyncWrapper(async (req, res) => {
   const warehouses = await warehouseService.getWarehouses(req.query);
 
-  return successResponse(res, 200, "Warehouses fetched successfully", {
-    warehouses,
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "Warehouses fetched successfully",
+    data: {
+      warehouses,
+    },
   });
 });
 
@@ -21,8 +26,13 @@ export const getWarehouses = asyncWrapper(async (req, res) => {
 export const getWarehouseById = asyncWrapper(async (req, res) => {
   const warehouse = await warehouseService.getWarehouseById(req.params.id);
 
-  return successResponse(res, 200, "Warehouse fetched successfully", {
-    warehouse,
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "Warehouse fetched successfully",
+    data: {
+      warehouse,
+    },
   });
 });
 
@@ -33,8 +43,13 @@ export const getWarehouseById = asyncWrapper(async (req, res) => {
 export const createWarehouse = asyncWrapper(async (req, res) => {
   const warehouse = await warehouseService.createWarehouse(req.body);
 
-  return successResponse(res, 201, "Warehouse created successfully", {
-    warehouse,
+  return successResponse({
+    res,
+    statusCode: 201,
+    message: "Warehouse created successfully",
+    data: {
+      warehouse,
+    },
   });
 });
 
@@ -48,8 +63,13 @@ export const updateWarehouse = asyncWrapper(async (req, res) => {
     req.body,
   );
 
-  return successResponse(res, 200, "Warehouse updated successfully", {
-    warehouse,
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "Warehouse updated successfully",
+    data: {
+      warehouse,
+    },
   });
 });
 
@@ -60,8 +80,13 @@ export const updateWarehouse = asyncWrapper(async (req, res) => {
 export const activateWarehouse = asyncWrapper(async (req, res) => {
   const warehouse = await warehouseService.activateWarehouse(req.params.id);
 
-  return successResponse(res, 200, "Warehouse activated successfully", {
-    warehouse,
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "Warehouse activated successfully",
+    data: {
+      warehouse,
+    },
   });
 });
 
@@ -72,8 +97,13 @@ export const activateWarehouse = asyncWrapper(async (req, res) => {
 export const deactivateWarehouse = asyncWrapper(async (req, res) => {
   const warehouse = await warehouseService.deactivateWarehouse(req.params.id);
 
-  return successResponse(res, 200, "Warehouse deactivated successfully", {
-    warehouse,
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "Warehouse deactivated successfully",
+    data: {
+      warehouse,
+    },
   });
 });
 
@@ -84,7 +114,12 @@ export const deactivateWarehouse = asyncWrapper(async (req, res) => {
 export const deleteWarehouse = asyncWrapper(async (req, res) => {
   const warehouse = await warehouseService.deleteWarehouse(req.params.id);
 
-  return successResponse(res, 200, "Warehouse deleted successfully", {
-    warehouse,
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "Warehouse deleted successfully",
+    data: {
+      warehouse,
+    },
   });
 });

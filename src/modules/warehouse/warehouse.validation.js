@@ -1,72 +1,87 @@
-import { z } from "zod";
+import Joi from "joi";
 
 const warehouseTypes = ["LOCAL", "IMPORT", "PREORDER", "DIGITAL"];
 
-export const warehouseIdSchema = z.object({
-  id: z.string().min(1, "Warehouse ID is required"),
+// ============================================================
+// WAREHOUSE ID
+// ============================================================
+
+export const warehouseIdSchema = Joi.object({
+  id: Joi.string().trim().min(1).required().messages({
+    "string.empty": "Warehouse ID is required",
+    "any.required": "Warehouse ID is required",
+  }),
 });
 
-export const createWarehouseSchema = z.object({
-  name: z
-    .string()
+// ============================================================
+// CREATE WAREHOUSE
+// ============================================================
+
+export const createWarehouseSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(120).required().messages({
+    "string.empty": "Warehouse name is required",
+    "string.min": "Warehouse name must be at least 2 characters",
+    "string.max": "Warehouse name cannot exceed 120 characters",
+    "any.required": "Warehouse name is required",
+  }),
+
+  code: Joi.string()
     .trim()
-    .min(2, "Warehouse name must be at least 2 characters")
-    .max(120, "Warehouse name cannot exceed 120 characters"),
+    .min(2)
+    .max(50)
+    .pattern(/^[A-Za-z0-9_-]+$/)
+    .required()
+    .messages({
+      "string.empty": "Warehouse code is required",
+      "string.min": "Warehouse code must be at least 2 characters",
+      "string.max": "Warehouse code cannot exceed 50 characters",
+      "string.pattern.base":
+        "Warehouse code must contain only letters, numbers, underscores, or hyphens",
+      "any.required": "Warehouse code is required",
+    }),
 
-  code: z
-    .string()
-    .trim()
-    .min(2, "Warehouse code is required")
-    .max(50, "Warehouse code cannot exceed 50 characters")
-    .regex(
-      /^[A-Z0-9_-]+$/,
-      "Warehouse code must contain only uppercase letters, numbers, underscores, or hyphens",
-    ),
+  type: Joi.string()
+    .valid(...warehouseTypes)
+    .default("LOCAL"),
 
-  type: z.enum(warehouseTypes).default("LOCAL"),
+  address: Joi.string().trim().max(255).allow(null, "").optional().messages({
+    "string.max": "Address cannot exceed 255 characters",
+  }),
 
-  address: z
-    .string()
-    .trim()
-    .max(255, "Address cannot exceed 255 characters")
-    .optional()
-    .nullable(),
+  city: Joi.string().trim().max(100).allow(null, "").optional().messages({
+    "string.max": "City cannot exceed 100 characters",
+  }),
 
-  city: z
-    .string()
-    .trim()
-    .max(100, "City cannot exceed 100 characters")
-    .optional()
-    .nullable(),
+  state: Joi.string().trim().max(100).allow(null, "").optional().messages({
+    "string.max": "State cannot exceed 100 characters",
+  }),
 
-  state: z
-    .string()
-    .trim()
-    .max(100, "State cannot exceed 100 characters")
-    .optional()
-    .nullable(),
+  country: Joi.string().trim().max(100).allow(null, "").optional().messages({
+    "string.max": "Country cannot exceed 100 characters",
+  }),
 
-  country: z
-    .string()
-    .trim()
-    .max(100, "Country cannot exceed 100 characters")
-    .optional()
-    .nullable(),
-
-  isActive: z.boolean().default(true),
+  isActive: Joi.boolean().default(true),
 });
+
+// ============================================================
+// UPDATE WAREHOUSE
+// ============================================================
 
 export const updateWarehouseSchema = createWarehouseSchema
-  .partial()
-  .refine((data) => Object.keys(data).length > 0, {
-    message: "At least one warehouse field is required",
+  .fork(["name", "code"], (schema) => schema.optional())
+  .min(1)
+  .messages({
+    "object.min": "At least one warehouse field is required",
   });
 
-export const warehouseQuerySchema = z.object({
-  type: z.enum(warehouseTypes).optional(),
+// ============================================================
+// QUERY
+// ============================================================
 
-  isActive: z
-    .enum(["true", "false"])
-    .transform((value) => value === "true")
+export const warehouseQuerySchema = Joi.object({
+  type: Joi.string()
+    .valid(...warehouseTypes)
     .optional(),
+
+  isActive: Joi.boolean().optional(),
 });

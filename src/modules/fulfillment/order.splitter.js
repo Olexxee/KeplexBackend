@@ -1,4 +1,4 @@
-import * as fulfillmentDb from "./fulfillment.db.js";
+import * as warehouseDb from "../warehouse/warehouse.db.js";
 
 const FULFILLMENT_TYPES = {
   LOCAL: "LOCAL",
@@ -8,12 +8,6 @@ const FULFILLMENT_TYPES = {
 };
 
 export class OrderSplitter {
-  /**
-   * Groups order/cart items by the variant's fulfillment type.
-   *
-   * Shipping method is intentionally NOT handled here.
-   * Shipping belongs to the shipping module.
-   */
   splitOrderByFulfillment(items = []) {
     const groups = {
       LOCAL: [],
@@ -29,9 +23,7 @@ export class OrderSplitter {
         FULFILLMENT_TYPES.LOCAL;
 
       if (!groups[fulfillmentType]) {
-        throw new Error(
-          `Unsupported fulfillment type: ${fulfillmentType}`,
-        );
+        throw new Error(`Unsupported fulfillment type: ${fulfillmentType}`);
       }
 
       groups[fulfillmentType].push(item);
@@ -42,20 +34,12 @@ export class OrderSplitter {
     );
   }
 
-  /**
-   * Assigns a warehouse according to fulfillment type.
-   *
-   * DIGITAL orders do not require a warehouse.
-   */
   async assignWarehouse(type, tx) {
     if (type === FULFILLMENT_TYPES.DIGITAL) {
       return null;
     }
 
-    const warehouse = await fulfillmentDb.findActiveWarehouseByType(
-      type,
-      tx,
-    );
+    const warehouse = await warehouseDb.findActiveWarehouseByType(type, tx);
 
     if (!warehouse) {
       throw new Error(
@@ -69,7 +53,9 @@ export class OrderSplitter {
   generateFulfillmentSummary(groups = {}) {
     return Object.entries(groups).map(([type, items]) => ({
       type,
+
       itemCount: items.length,
+
       quantity: items.reduce(
         (total, item) => total + Number(item.quantity || 0),
         0,
@@ -79,4 +65,5 @@ export class OrderSplitter {
 }
 
 export const orderSplitter = new OrderSplitter();
+
 export { FULFILLMENT_TYPES };

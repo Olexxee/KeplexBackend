@@ -30,41 +30,42 @@ shippingRouter.post(
 );
 
 // ============================================================
-// CONFIGURATION
+// SHIPPING CONFIGURATION
 // ============================================================
 
 shippingRouter.post(
   "/configurations",
   authMiddleware,
-  roleMiddleware,
-  validate(createShippingConfigSchema),
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
+  validateBody(createShippingConfigSchema),
   shippingController.createShippingConfig,
 );
 
 shippingRouter.get(
   "/configurations",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   shippingController.getShippingConfigs,
 );
 
 shippingRouter.get(
   "/configurations/active",
   authMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   shippingController.getActiveShippingConfig,
 );
 
 shippingRouter.get(
   "/configurations/:id",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   shippingController.getShippingConfig,
 );
 
 shippingRouter.patch(
   "/configurations/:id",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   validateBody(updateShippingConfigSchema),
   shippingController.updateShippingConfig,
 );
@@ -76,7 +77,7 @@ shippingRouter.patch(
 shippingRouter.post(
   "/rules",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   validateBody(createShippingRuleSchema),
   shippingController.createShippingRule,
 );
@@ -84,21 +85,21 @@ shippingRouter.post(
 shippingRouter.get(
   "/rules",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   shippingController.getShippingRules,
 );
 
 shippingRouter.get(
   "/rules/:id",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   shippingController.getShippingRule,
 );
 
 shippingRouter.patch(
   "/rules/:id",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   validateBody(updateShippingRuleSchema),
   shippingController.updateShippingRule,
 );
@@ -106,7 +107,7 @@ shippingRouter.patch(
 shippingRouter.delete(
   "/rules/:id",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   shippingController.deleteShippingRule,
 );
 
@@ -117,7 +118,7 @@ shippingRouter.delete(
 shippingRouter.post(
   "/calculate-cbm",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   validateBody(variantCBMSchema),
   shippingController.calculateCBMForVariant,
 );
@@ -125,7 +126,7 @@ shippingRouter.post(
 shippingRouter.post(
   "/orders/calculate-cbm",
   authMiddleware,
-  roleMiddleware,
+  roleMiddleware("ADMIN", "SUPER_ADMIN"),
   validateBody(orderCBMSchema),
   shippingController.updateOrderWithCBM,
 );

@@ -1,6 +1,11 @@
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
+
 import * as fulfillmentService from "./fulfillment.service.js";
+
+// ============================================================
+// FULFILLMENTS
+// ============================================================
 
 export const getFulfillments = asyncWrapper(async (req, res) => {
   const result = await fulfillmentService.getFulfillments(req.query);
@@ -8,8 +13,8 @@ export const getFulfillments = asyncWrapper(async (req, res) => {
   return successResponse({
     res,
     message: "Fulfillments fetched successfully",
-    data: result.data,
-    meta: result.meta,
+    data: result.fulfillments,
+    meta: result.pagination,
   });
 });
 
@@ -75,70 +80,14 @@ export const deleteFulfillment = asyncWrapper(async (req, res) => {
 });
 
 export const createFulfillmentsForOrder = asyncWrapper(async (req, res) => {
-  const fulfillments = await fulfillmentService.createFulfillmentsForOrder(
+  const fulfillments = await fulfillmentService.generateFulfillmentsForOrder(
     req.params.orderId,
   );
 
   return successResponse({
     res,
     statusCode: 201,
-    message: "Fulfillments created successfully",
+    message: "Fulfillments generated successfully",
     data: fulfillments,
-  });
-});
-
-// Warehouse Controllers
-export const getWarehouses = asyncWrapper(async (req, res) => {
-  const result = await fulfillmentService.getWarehouses(req.query);
-
-  return successResponse({
-    res,
-    message: "Warehouses fetched successfully",
-    data: result.data,
-    meta: result.meta,
-  });
-});
-
-export const getWarehouseById = asyncWrapper(async (req, res) => {
-  const warehouse = await fulfillmentService.getWarehouseById(req.params.id);
-
-  return successResponse({
-    res,
-    message: "Warehouse fetched successfully",
-    data: warehouse,
-  });
-});
-
-export const createWarehouse = asyncWrapper(async (req, res) => {
-  const warehouse = await fulfillmentService.createWarehouse(req.body);
-
-  return successResponse({
-    res,
-    statusCode: 201,
-    message: "Warehouse created successfully",
-    data: warehouse,
-  });
-});
-
-export const updateWarehouse = asyncWrapper(async (req, res) => {
-  const warehouse = await fulfillmentService.updateWarehouse(
-    req.params.id,
-    req.body,
-  );
-
-  return successResponse({
-    res,
-    message: "Warehouse updated successfully",
-    data: warehouse,
-  });
-});
-
-export const deleteWarehouse = asyncWrapper(async (req, res) => {
-  await fulfillmentService.deleteWarehouse(req.params.id);
-
-  return successResponse({
-    res,
-    message: "Warehouse deleted successfully",
-    data: null,
   });
 });

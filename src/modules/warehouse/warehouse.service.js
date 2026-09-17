@@ -35,10 +35,17 @@ const normalizeNullableString = (value) => {
 // ============================================================
 
 export const getWarehouses = async ({ type, isActive } = {}) => {
-  return warehouseDb.findWarehouses({
+  console.log("3. WAREHOUSE SERVICE HIT");
+  console.log("filters:", { type, isActive });
+
+  const result = await warehouseDb.findWarehouses({
     type,
     isActive,
   });
+
+  console.log("4. WAREHOUSE DB RETURNED");
+
+  return result;
 };
 
 // ============================================================
