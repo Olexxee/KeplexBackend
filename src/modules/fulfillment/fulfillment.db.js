@@ -1,3 +1,5 @@
+// src/modules/fulfillment/fulfillment.db.js
+
 import { prisma } from "../../config/prisma.js";
 
 // ============================================================
@@ -41,7 +43,6 @@ const fulfillmentInclude = {
       customerName: true,
       customerEmail: true,
       customerPhone: true,
-
       shippingLabel: true,
       shippingStreet: true,
       shippingCity: true,
@@ -52,7 +53,7 @@ const fulfillmentInclude = {
 };
 
 // ============================================================
-// FULFILLMENTS
+// CREATE
 // ============================================================
 
 export const createFulfillment = async (data, tx = prisma) => {
@@ -62,6 +63,10 @@ export const createFulfillment = async (data, tx = prisma) => {
   });
 };
 
+// ============================================================
+// FIND BY ID
+// ============================================================
+
 export const findFulfillmentById = async (id, tx = prisma) => {
   return tx.fulfillment.findUnique({
     where: {
@@ -70,6 +75,10 @@ export const findFulfillmentById = async (id, tx = prisma) => {
     include: fulfillmentInclude,
   });
 };
+
+// ============================================================
+// FIND BY ORDER ID
+// ============================================================
 
 export const findFulfillmentsByOrderId = async (orderId, tx = prisma) => {
   return tx.fulfillment.findMany({
@@ -83,10 +92,22 @@ export const findFulfillmentsByOrderId = async (orderId, tx = prisma) => {
   });
 };
 
+// ============================================================
+// FIND ALL WITH FILTERS AND PAGINATION
+// ============================================================
+
 export const findFulfillments = async (
-  { orderId, type, status, warehouseId, page = 1, limit = 20 } = {},
+  { page = 1, limit = 20, orderId, type, status, warehouseId } = {},
   tx = prisma,
 ) => {
+  // Express query parameters arrive as strings.
+  // Convert them before passing them to Prisma.
+  const parsedPage = Math.max(1, Number(page) || 1);
+
+  const parsedLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+
+  const skip = (parsedPage - 1) * parsedLimit;
+
   const where = {};
 
   if (orderId) {
@@ -105,15 +126,12 @@ export const findFulfillments = async (
     where.warehouseId = warehouseId;
   }
 
-  const skip = (page - 1) * limit;
-
   const [fulfillments, total] = await Promise.all([
     tx.fulfillment.findMany({
       where,
       skip,
-      take: limit,
+      take: parsedLimit,
       include: fulfillmentInclude,
-
       orderBy: {
         createdAt: "desc",
       },
@@ -126,53 +144,32 @@ export const findFulfillments = async (
 
   return {
     fulfillments,
-
     pagination: {
-      page,
-      limit,
+      page: parsedPage,
+      limit: parsedLimit,
       total,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / parsedLimit),
     },
   };
 };
 
-export const updateFulfillment = async (id, data, tx = prisma) => {
-  return tx.fulfillment.update({
-    where: {
-      id,
-    },
-
-    data,
-
-    include: fulfillmentInclude,
-  });
-};
-
-export const updateFulfillmentStatus = async (id, status, tx = prisma) => {
-  return tx.fulfillment.update({
-    where: {
-      id,
-    },
-
-    data: {
-      status,
-    },
-
-    include: fulfillmentInclude,
-  });
-};
+// ============================================================
+// UPDATE TRACKING
+// ============================================================
 
 export const updateFulfillmentTracking = async (id, data, tx = prisma) => {
   return tx.fulfillment.update({
     where: {
       id,
     },
-
     data,
-
     include: fulfillmentInclude,
   });
 };
+
+// ============================================================
+// DELETE
+// ============================================================
 
 export const deleteFulfillment = async (id, tx = prisma) => {
   return tx.fulfillment.delete({

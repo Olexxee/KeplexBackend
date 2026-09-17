@@ -8,7 +8,15 @@ export const checkoutSchema = Joi.object({
 
 export const updateOrderStatusSchema = Joi.object({
   status: Joi.string()
-    .valid("PENDING", "CONFIRMED", "PROCESSING", "COMPLETED", "CANCELLED")
+    .valid(
+      "PENDING",
+      "CONFIRMED",
+      "PROCESSING",
+      "SHIPPED",
+      "DELIVERED",
+      "COMPLETED",
+      "CANCELLED",
+    )
     .required(),
 });
 
