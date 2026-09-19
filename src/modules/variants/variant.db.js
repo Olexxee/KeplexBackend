@@ -1,39 +1,59 @@
 // modules/variants/variant.db.js
 import { prisma } from "../../config/prisma.js";
 
+// ============================================================================
+// CLIENT RESOLVER
+// ============================================================================
+//
+// Callers frequently pass `tx = null` (see variant.service.js) meaning
+// "no active transaction, use the global client". Default parameters
+// only fire on `undefined`, not `null`, so every function resolves the
+// client explicitly instead of relying on a default value.
+
+const db = (tx) => tx ?? prisma;
+
+// ============================================================================
+// SHARED INCLUDES
+// ============================================================================
+//
+// Narrowed from the previous version. cartItems / orderItems / reviews
+// were pulled on every read and write, making every variant operation
+// several times more expensive than necessary. Callers that need those
+// relations should use a dedicated accessor (add one when needed)
+// rather than paying for them unconditionally.
+
 const variantInclude = {
   product: {
     select: {
       id: true,
       name: true,
       slug: true,
-      brand: true,
-      category: true,
-      collection: true,
+      categoryId: true,
+      brand: { select: { id: true, name: true, slug: true } },
+      category: { select: { id: true, name: true, slug: true } },
+      collection: { select: { id: true, name: true, slug: true } },
     },
   },
-  media: {
-    orderBy: { sortOrder: "asc" },
-  },
-  cartItems: true,
-  orderItems: true,
-  // wishlists: true,
-  reviews: true,
+  media: { orderBy: { sortOrder: "asc" } },
 };
 
-export const createVariant = (data, tx = prisma) => {
-  return tx.productVariant.create({
-    data,
-    include: variantInclude,
-  });
+const variantWriteInclude = {
+  media: { orderBy: { sortOrder: "asc" } },
 };
+
+// ============================================================================
+// CRUD
+// ============================================================================
+
+export const createVariant = (data, tx = null) =>
+  db(tx).productVariant.create({ data, include: variantInclude });
 
 export const createVariantWithMedia = async (
   variantData,
   mediaData = [],
-  tx = prisma,
-) => {
-  return tx.productVariant.create({
+  tx = null,
+) =>
+  db(tx).productVariant.create({
     data: {
       ...variantData,
       media: {
@@ -50,15 +70,16 @@ export const createVariantWithMedia = async (
         })),
       },
     },
-    include: variantInclude,
+    include: variantWriteInclude,
   });
-};
 
-export const bulkCreateVariants = async (variantsData, tx = prisma) => {
-  return tx.$transaction(
+export const bulkCreateVariants = async (variantsData, tx = null) => {
+  const client = db(tx);
+
+  return client.$transaction(
     variantsData.map((data) => {
       const { variantImages = [], ...variantData } = data;
-      return tx.productVariant.create({
+      return client.productVariant.create({
         data: {
           ...variantData,
           media:
@@ -78,27 +99,25 @@ export const bulkCreateVariants = async (variantsData, tx = prisma) => {
                 }
               : undefined,
         },
-        include: variantInclude,
+        include: variantWriteInclude,
       });
     }),
   );
 };
 
-export const findVariantById = (id, tx = prisma) => {
-  return tx.productVariant.findUnique({
+export const findVariantById = (id, tx = null) =>
+  db(tx).productVariant.findUnique({
     where: { id },
     include: variantInclude,
   });
-};
 
-export const findVariantBySKU = (sku, tx = prisma) => {
-  return tx.productVariant.findUnique({
+export const findVariantBySKU = (sku, tx = null) =>
+  db(tx).productVariant.findUnique({
     where: { sku },
     include: variantInclude,
   });
-};
 
-export const findVariantsByProduct = (productId, filters = {}, tx = prisma) => {
+export const findVariantsByProduct = (productId, filters = {}, tx = null) => {
   const { isActive, minPrice, maxPrice, fulfillmentType, shippingType } =
     filters;
 
@@ -111,181 +130,144 @@ export const findVariantsByProduct = (productId, filters = {}, tx = prisma) => {
     ...(maxPrice !== undefined && { price: { lte: maxPrice } }),
   };
 
-  return tx.productVariant.findMany({
+  return db(tx).productVariant.findMany({
     where,
     include: variantInclude,
     orderBy: { createdAt: "desc" },
   });
 };
 
-export const updateVariant = (id, data, tx = prisma) => {
-  return tx.productVariant.update({
+export const updateVariant = (id, data, tx = null) =>
+  db(tx).productVariant.update({
     where: { id },
     data,
-    include: variantInclude,
+    include: variantWriteInclude,
   });
-};
 
-export const updateVariantMedia = async (id, mediaData = [], tx = prisma) => {
-  return tx.$transaction(async (tx) => {
-    // Delete existing media
-    await tx.variantMedia.deleteMany({
-      where: { variantId: id },
-    });
+export const updateVariantMedia = async (id, mediaData = [], tx = null) => {
+  const client = db(tx);
 
-    // Create new media
-    return tx.productVariant.update({
-      where: { id },
-      data: {
-        media: {
-          create: mediaData.map((image, index) => ({
-            url: image.url,
-            publicId: image.publicId,
-            mimeType: image.mimeType,
-            bytes: image.bytes,
-            format: image.format,
-            width: image.width,
-            height: image.height,
-            isPrimary: index === 0,
-            sortOrder: index,
-          })),
-        },
-      },
-      include: variantInclude,
-    });
-  });
-};
+  await client.variantMedia.deleteMany({ where: { variantId: id } });
 
-export const deleteVariant = (id, tx = prisma) => {
-  return tx.productVariant.delete({
+  return client.productVariant.update({
     where: { id },
-    include: variantInclude,
+    data: {
+      media: {
+        create: mediaData.map((image, index) => ({
+          url: image.url,
+          publicId: image.publicId,
+          mimeType: image.mimeType,
+          bytes: image.bytes,
+          format: image.format,
+          width: image.width,
+          height: image.height,
+          isPrimary: index === 0,
+          sortOrder: index,
+        })),
+      },
+    },
+    include: variantWriteInclude,
   });
 };
 
-export const updateVariantStock = (id, quantity, tx = prisma) => {
-  return tx.productVariant.update({
+export const deleteVariant = (id, tx = null) =>
+  db(tx).productVariant.delete({
+    where: { id },
+    include: variantWriteInclude,
+  });
+
+export const updateVariantStock = (id, quantity, tx = null) =>
+  db(tx).productVariant.update({
     where: { id },
     data: { stock: quantity },
-    include: variantInclude,
+    include: variantWriteInclude,
   });
-};
 
-export const decrementVariantStock = (id, quantity, tx = prisma) => {
-  return tx.productVariant.updateMany({
-    where: {
-      id,
-      stock: { gte: quantity },
-    },
-    data: {
-      stock: { decrement: quantity },
-    },
+export const decrementVariantStock = (id, quantity, tx = null) =>
+  db(tx).productVariant.updateMany({
+    where: { id, stock: { gte: quantity } },
+    data: { stock: { decrement: quantity } },
   });
-};
 
-export const incrementVariantStock = (id, quantity, tx = prisma) => {
-  return tx.productVariant.update({
+export const incrementVariantStock = (id, quantity, tx = null) =>
+  db(tx).productVariant.update({
     where: { id },
-    data: {
-      stock: { increment: quantity },
-    },
+    data: { stock: { increment: quantity } },
+    include: variantWriteInclude,
+  });
+
+export const findVariantsByIds = (ids, tx = null) =>
+  db(tx).productVariant.findMany({
+    where: { id: { in: ids } },
     include: variantInclude,
   });
-};
 
-export const findVariantsByIds = (ids, tx = prisma) => {
-  return tx.productVariant.findMany({
-    where: {
-      id: { in: ids },
-    },
+export const findVariantsBySKUs = (skus, tx = null) =>
+  db(tx).productVariant.findMany({
+    where: { sku: { in: skus } },
     include: variantInclude,
   });
-};
 
-export const findVariantsBySKUs = (skus, tx = prisma) => {
-  return tx.productVariant.findMany({
-    where: {
-      sku: { in: skus },
-    },
-    include: variantInclude,
-  });
-};
-
-export const updateVariantStatus = (id, isActive, tx = prisma) => {
-  return tx.productVariant.update({
+export const updateVariantStatus = (id, isActive, tx = null) =>
+  db(tx).productVariant.update({
     where: { id },
     data: { isActive },
-    include: variantInclude,
+    include: variantWriteInclude,
   });
-};
 
-export const bulkUpdateVariantStock = (updates, tx = prisma) => {
-  return tx.$transaction(
+export const bulkUpdateVariantStock = (updates, tx = null) => {
+  const client = db(tx);
+
+  return client.$transaction(
     updates.map(({ id, quantity }) =>
-      tx.productVariant.update({
+      client.productVariant.update({
         where: { id },
         data: { stock: quantity },
-        include: variantInclude,
+        include: variantWriteInclude,
       }),
     ),
   );
 };
 
-export const bulkDeleteVariants = (ids, tx = prisma) => {
-  return tx.$transaction(
+export const bulkDeleteVariants = (ids, tx = null) => {
+  const client = db(tx);
+
+  return client.$transaction(
     ids.map((id) =>
-      tx.productVariant.delete({
+      client.productVariant.delete({
         where: { id },
-        include: variantInclude,
+        include: variantWriteInclude,
       }),
     ),
   );
 };
 
-export const getVariantWithStockCheck = (id, requiredQuantity, tx = prisma) => {
-  return tx.productVariant.findFirst({
-    where: {
-      id,
-      stock: { gte: requiredQuantity },
-      isActive: true,
-    },
+export const getVariantWithStockCheck = (id, requiredQuantity, tx = null) =>
+  db(tx).productVariant.findFirst({
+    where: { id, stock: { gte: requiredQuantity }, isActive: true },
     include: variantInclude,
   });
-};
 
-export const findLowStockVariants = (threshold = 10, tx = prisma) => {
-  return tx.productVariant.findMany({
-    where: {
-      stock: { lte: threshold },
-      isActive: true,
-    },
+export const findLowStockVariants = (threshold = 10, tx = null) =>
+  db(tx).productVariant.findMany({
+    where: { stock: { lte: threshold }, isActive: true },
     include: {
-      product: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-        },
-      },
+      product: { select: { id: true, name: true, slug: true } },
     },
     orderBy: { stock: "asc" },
   });
-};
 
-export const getVariantMetrics = async (tx = prisma) => {
+export const getVariantMetrics = async (tx = null) => {
+  const client = db(tx);
+
   const [total, active, outOfStock, lowStock] = await Promise.all([
-    tx.productVariant.count(),
-    tx.productVariant.count({ where: { isActive: true } }),
-    tx.productVariant.count({ where: { stock: 0, isActive: true } }),
-    tx.productVariant.count({
+    client.productVariant.count(),
+    client.productVariant.count({ where: { isActive: true } }),
+    client.productVariant.count({ where: { stock: 0, isActive: true } }),
+    client.productVariant.count({
       where: { stock: { lte: 10, gt: 0 }, isActive: true },
     }),
   ]);
 
-  return {
-    total,
-    active,
-    outOfStock,
-    lowStock,
-  };
+  return { total, active, outOfStock, lowStock };
 };

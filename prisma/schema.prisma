@@ -721,6 +721,23 @@ model BusinessConfig {
   @@index([key])
 }
 
+model ArchiveRecord {
+  id            String   @id @default(cuid())
+  entityType    String   // "PRODUCT" | "VARIANT"
+  entityId      String
+  snapshot      Json
+  reason        String?
+  archivedBy    String?
+  archivedAt    DateTime @default(now())
+  restoreUntil  DateTime
+  restoredAt    DateTime?
+  hardDeletedAt DateTime?
+
+  @@unique([entityType, entityId])
+  @@index([entityType, archivedAt])
+  @@index([restoreUntil])
+}
+
 // ==========================================
 // ENUMS
 // ==========================================

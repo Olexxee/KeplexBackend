@@ -39,9 +39,9 @@ const variantSchema = Joi.object({
     .items(Joi.number().integer().min(0))
     .default([]),
 
-  attributes: Joi.object().optional(),
+  attributes: Joi.object().allow(null).optional(),
 
-  metadata: Joi.object().optional(),
+  metadata: Joi.object().allow(null).optional(),
 });
 
 export const createProductSchema = Joi.object({
@@ -72,6 +72,8 @@ export const createProductSchema = Joi.object({
   // Transport-only.
   // This is consumed by the aggregate service
   // and must never be sent to Prisma Product.
+  variants: Joi.array().items(variantSchema).min(1).required(),
+
   variantImages: Joi.array()
     .items(
       Joi.object({
@@ -87,10 +89,27 @@ export const createProductSchema = Joi.object({
     .default([]),
 });
 
-export const updateProductSchema = createProductSchema
-  .fork(["name", "slug", "categoryId", "variants"], (schema) =>
-    schema.optional(),
-  )
+// Update product scalars — variants are no longer part of this payload.
+export const updateProductSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(150).optional(),
+  slug: Joi.string().trim().lowercase().min(2).max(150).optional(),
+  description: Joi.string().trim().allow(null, "").optional(),
+  brandId: Joi.string().allow(null, "").optional(),
+  categoryId: Joi.string().optional(),
+  collectionId: Joi.string().allow(null, "").optional(),
+  isFeatured: Joi.boolean().optional(),
+  isNew: Joi.boolean().optional(),
+  isBestSeller: Joi.boolean().optional(),
+  status: Joi.string().valid("DRAFT", "ACTIVE", "ARCHIVED").optional(),
+  metadata: Joi.object().allow(null).optional(),
+}).min(1);
+
+// Single variant payload (used by POST /products/:id/variants)
+export const createSingleVariantSchema = variantSchema;
+
+// Update variant payload (used by PATCH /variants/:id)
+export const updateVariantBodySchema = variantSchema
+  .fork(["weight", "price", "actualWeight"], (s) => s.optional())
   .min(1);
 
 export const updateProductStatusSchema = Joi.object({

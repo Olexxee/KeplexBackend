@@ -1,18 +1,20 @@
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
-
 import * as productService from "./product.service.js";
-import { productEngine } from "./product.engine.service.js";
-import * as productAggregateService from "./product.aggregate.service.js";
+import {
+  toStorefrontCard,
+  toStorefrontCards,
+  toStorefrontDetail,
+  toAdminList,
+  toAdminDetail,
+} from "./product.mapper.js";
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
 const buildProductPayload = (req) => {
-  const payload = {
-    ...req.body,
-  };
+  const payload = { ...req.body };
 
   if (typeof payload.variants === "string") {
     try {
@@ -30,7 +32,7 @@ const buildProductPayload = (req) => {
 };
 
 // ============================================================================
-// PUBLIC — PRODUCT LIST
+// PUBLIC — LIST
 // ============================================================================
 
 export const getProducts = asyncWrapper(async (req, res) => {
@@ -38,75 +40,83 @@ export const getProducts = asyncWrapper(async (req, res) => {
 
   const options = {
     featuredLimit: Number(req.query.featuredLimit) || 6,
-
     newLimit: Number(req.query.newLimit) || 4,
-
     bestSellerLimit: Number(req.query.bestSellerLimit) || 4,
-
     relatedLimit: Number(req.query.relatedLimit) || 4,
   };
 
   const resolvedContext = slug || id ? "product-detail" : context;
 
-  const result = await productEngine.getProducts({
+  const result = await productService.getProductsByContext({
     context: resolvedContext,
-
-    filters: {
-      ...filters,
-      slug,
-      id,
-    },
-
+    filters: { ...filters, slug, id },
     options,
   });
 
+  let data = result.data;
+
+  if (resolvedContext === "catalog") {
+    const { products } = data;
+    // The db layer returns `{ products, total }` but the engine only
+    // forwards `products` on the catalog path — handle both shapes.
+    const list = Array.isArray(products) ? products : [];
+    data = { products: toStorefrontCards(list) };
+  } else if (resolvedContext === "homepage") {
+    data = {
+      featured: toStorefrontCards(result.data.featured ?? []),
+      newArrivals: toStorefrontCards(result.data.newArrivals ?? []),
+      bestSellers: toStorefrontCards(result.data.bestSellers ?? []),
+    };
+  } else if (resolvedContext === "product-detail") {
+    data = {
+      product: toStorefrontDetail(
+        result.data.product,
+        result.data.related ?? [],
+      ),
+    };
+  }
+
   return successResponse({
     res,
-
     message: "Products fetched successfully",
-
-    data: result.data,
-
+    data,
     meta: result.meta,
-
     context: result.context,
   });
 });
 
 // ============================================================================
-// PUBLIC — PRODUCT BY ID
+// PUBLIC — BY ID
 // ============================================================================
 
 export const getProductById = asyncWrapper(async (req, res) => {
   const product = await productService.getProductById(req.params.id);
+  const related = await productService.getRelatedProducts(product.id, 4);
 
   return successResponse({
     res,
-
     message: "Product fetched successfully",
-
-    data: product,
+    data: toStorefrontDetail(product, related),
   });
 });
 
 // ============================================================================
-// PUBLIC — PRODUCT BY SLUG
+// PUBLIC — BY SLUG
 // ============================================================================
 
 export const getProductBySlug = asyncWrapper(async (req, res) => {
   const product = await productService.getProductBySlug(req.params.slug);
+  const related = await productService.getRelatedProducts(product.id, 4);
 
   return successResponse({
     res,
-
     message: "Product fetched successfully",
-
-    data: product,
+    data: toStorefrontDetail(product, related),
   });
 });
 
 // ============================================================================
-// PUBLIC — FEATURED
+// PUBLIC — FEATURED / NEW / BEST
 // ============================================================================
 
 export const getFeaturedProducts = asyncWrapper(async (req, res) => {
@@ -116,16 +126,10 @@ export const getFeaturedProducts = asyncWrapper(async (req, res) => {
 
   return successResponse({
     res,
-
     message: "Featured products fetched successfully",
-
-    data: products,
+    data: toStorefrontCards(products),
   });
 });
-
-// ============================================================================
-// PUBLIC — NEW ARRIVALS
-// ============================================================================
 
 export const getNewArrivals = asyncWrapper(async (req, res) => {
   const products = await productService.getNewArrivals(
@@ -134,16 +138,10 @@ export const getNewArrivals = asyncWrapper(async (req, res) => {
 
   return successResponse({
     res,
-
     message: "New arrivals fetched successfully",
-
-    data: products,
+    data: toStorefrontCards(products),
   });
 });
-
-// ============================================================================
-// PUBLIC — BEST SELLERS
-// ============================================================================
 
 export const getBestSellers = asyncWrapper(async (req, res) => {
   const products = await productService.getBestSellers(
@@ -152,20 +150,17 @@ export const getBestSellers = asyncWrapper(async (req, res) => {
 
   return successResponse({
     res,
-
     message: "Best sellers fetched successfully",
-
-    data: products,
+    data: toStorefrontCards(products),
   });
 });
 
 // ============================================================================
-// PUBLIC — RELATED PRODUCTS
+// PUBLIC — RELATED
 // ============================================================================
 
 export const getRelatedProducts = asyncWrapper(async (req, res) => {
   const query = req.validated?.query ?? req.query;
-
   const products = await productService.getRelatedProducts(
     req.params.id,
     query.limit,
@@ -173,15 +168,13 @@ export const getRelatedProducts = asyncWrapper(async (req, res) => {
 
   return successResponse({
     res,
-
     message: "Related products fetched successfully",
-
-    data: products,
+    data: toStorefrontCards(products),
   });
 });
 
 // ============================================================================
-// PUBLIC — PRODUCT VARIANTS
+// PUBLIC — VARIANTS
 // ============================================================================
 
 export const getProductVariants = asyncWrapper(async (req, res) => {
@@ -189,89 +182,107 @@ export const getProductVariants = asyncWrapper(async (req, res) => {
 
   return successResponse({
     res,
-
     message: "Product variants fetched successfully",
-
     data: variants,
   });
 });
 
 // ============================================================================
-// ADMIN — CREATE PRODUCT
+// ADMIN — READ
 // ============================================================================
 
-export const createProduct = asyncWrapper(async (req, res) => {
-  const payload = buildProductPayload(req);
-
-  const product = await productAggregateService.createProductAggregate(payload);
+export const getAdminProductById = asyncWrapper(async (req, res) => {
+  const product = await productService.getProductByIdForAdmin(req.params.id);
 
   return successResponse({
     res,
-
-    statusCode: 201,
-
-    message: "Product created successfully",
-
-    data: product,
+    message: "Product fetched successfully",
+    data: toAdminDetail(product),
   });
 });
 
-// ============================================================================
-// ADMIN — UPDATE PRODUCT
-// ============================================================================
-
-export const updateProduct = asyncWrapper(async (req, res) => {
-  const payload = buildProductPayload(req);
-
-  const product = await productAggregateService.updateProductAggregate(
-    req.params.id,
-    payload,
+export const getAdminProducts = asyncWrapper(async (req, res) => {
+  const result = await productService.getProducts(
+    req.validated?.query ?? req.query,
   );
 
   return successResponse({
     res,
-
-    message: "Product updated successfully",
-
-    data: product,
+    message: "Products fetched successfully",
+    data: { products: toAdminList(result.products) },
+    meta: { pagination: result.meta },
   });
 });
 
 // ============================================================================
-// ADMIN — UPDATE PRODUCT STATUS
+// ADMIN — WRITE
 // ============================================================================
+
+export const createProduct = asyncWrapper(async (req, res) => {
+  const payload = buildProductPayload(req);
+  const product = await productService.createProduct(payload);
+
+  return successResponse({
+    res,
+    statusCode: 201,
+    message: "Product created successfully",
+    data: toAdminDetail(product),
+  });
+});
+
+export const updateProduct = asyncWrapper(async (req, res) => {
+  const payload = buildProductPayload(req);
+  const product = await productService.updateProduct(req.params.id, payload);
+
+  return successResponse({
+    res,
+    message: "Product updated successfully",
+    data: toAdminDetail(product),
+  });
+});
 
 export const updateProductStatus = asyncWrapper(async (req, res) => {
   const { status } = req.body;
-
-  const product = await productAggregateService.updateProductStatusAggregate(
+  const product = await productService.updateProductStatus(
     req.params.id,
     status,
   );
 
   return successResponse({
     res,
-
     message: "Product status updated successfully",
+    data: toAdminDetail(product),
+  });
+});
 
-    data: product,
+export const archiveProduct = asyncWrapper(async (req, res) => {
+  const { reason } = req.body ?? {};
+  const result = await productService.archiveProduct(req.params.id, {
+    reason,
+    archivedBy: req.user?.id,
+  });
+
+  return successResponse({
+    res,
+    message: "Product archived successfully",
+    data: result,
   });
 });
 
 // ============================================================================
-// ADMIN — DELETE PRODUCT
+// ADMIN — CREATE SINGLE VARIANT FOR PRODUCT
 // ============================================================================
 
-export const deleteProduct = asyncWrapper(async (req, res) => {
-  const product = await productAggregateService.deleteProductAggregate(
-    req.params.id,
-  );
+export const createVariantForProduct = asyncWrapper(async (req, res) => {
+  const productId = req.params.id;
+  const payload = { ...req.body, productId };
+
+  const variant = await productService.createVariant(payload);
 
   return successResponse({
     res,
-
-    message: "Product deleted successfully",
-
-    data: product,
+    statusCode: 201,
+    message: "Variant created successfully",
+    data: variant,
   });
 });
