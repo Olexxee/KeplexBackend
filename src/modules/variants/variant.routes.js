@@ -8,7 +8,8 @@ import {
   validateQuery,
 } from "../../middlewares/validateMiddleware.js";
 import { uploadVariantImages } from "../../middlewares/uploadMiddleware.js";
-import { processVariantImages } from "../../middlewares/processMedia.js";
+import { processVariantImages } from "../../middlewares/processItemImages.js";
+import { parseProductMultipart } from "../../middlewares/parseProductMultipart.js";
 import * as controller from "./variant.controller.js";
 import {
   createVariantSchema,
@@ -53,6 +54,9 @@ router.patch(
   "/:id",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  uploadVariantImages,
+  processVariantImages,
+  parseProductMultipart,
   validateParams(variantIdSchema),
   validateBody(updateVariantSchema),
   controller.updateVariant,
@@ -75,6 +79,22 @@ router.delete(
   roleMiddleware("SUPER_ADMIN", "ADMIN"),
   validateParams(variantIdSchema),
   controller.deleteVariant,
+);
+
+router.delete(
+  "/:id",
+  authMiddleware,
+  roleMiddleware("SUPER_ADMIN", "ADMIN"),
+  validateParams(variantIdSchema),
+  controller.archiveVariant,
+);
+
+router.post(
+  "/:id/restore",
+  authMiddleware,
+  roleMiddleware("SUPER_ADMIN", "ADMIN"),
+  validateParams(variantIdSchema),
+  controller.restoreVariant,
 );
 
 // Bulk create variants with images

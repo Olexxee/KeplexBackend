@@ -1,6 +1,11 @@
 // modules/products/product.db.js
-
 import { prisma } from "../../config/prisma.js";
+
+// ============================================================================
+// CLIENT RESOLVER
+// ============================================================================
+
+const db = (tx) => tx ?? prisma;
 
 // ============================================================================
 // SHARED INCLUDES
@@ -18,28 +23,15 @@ const brandInclude = {
 };
 
 const categoryInclude = {
-  select: {
-    id: true,
-    name: true,
-    slug: true,
-    type: true,
-  },
+  select: { id: true, name: true, slug: true, type: true },
 };
 
 const categoryCardInclude = {
-  select: {
-    id: true,
-    name: true,
-    slug: true,
-  },
+  select: { id: true, name: true, slug: true },
 };
 
 const collectionInclude = {
-  select: {
-    id: true,
-    name: true,
-    slug: true,
-  },
+  select: { id: true, name: true, slug: true },
 };
 
 // ============================================================================
@@ -68,7 +60,7 @@ const variantReviewsInclude = {
 };
 
 // ============================================================================
-// PRODUCT DETAIL
+// PRODUCT INCLUDES
 // ============================================================================
 
 const productDetailVariantsInclude = {
@@ -80,25 +72,33 @@ const productDetailVariantsInclude = {
   orderBy: { createdAt: "asc" },
 };
 
-export const productDetailInclude = {
-  brand: brandInclude,
-  category: categoryInclude,
-  collection: collectionInclude,
-  variants: productDetailVariantsInclude,
-  _count: {
-    select: { variants: true },
-  },
-};
-
-// ============================================================================
-// PRODUCT CARD
-// ============================================================================
-
-const productCardVariantsInclude = {
-  where: { isActive: true },
-  take: 1,
+const productAdminVariantsInclude = {
   include: {
     ...variantMediaInclude,
+    ...variantReviewsInclude,
+  },
+  orderBy: { createdAt: "asc" },
+  // No isActive filter — admin sees everything.
+};
+
+/**
+ * Card include: full active variant list, minimal per-variant shape.
+ * The `take: 1` that used to live here silently broke priceRange
+ * (the mapper only saw one variant's price). Never re-add it.
+ */
+const productCardVariantsInclude = {
+  where: { isActive: true },
+  select: {
+    id: true,
+    color: true,
+    size: true,
+    price: true,
+    compareAtPrice: true,
+    stock: true,
+    isActive: true,
+    media: {
+      orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+    },
     reviews: {
       where: { status: "APPROVED" },
       select: { rating: true },
@@ -107,71 +107,58 @@ const productCardVariantsInclude = {
   orderBy: { createdAt: "asc" },
 };
 
+export const productDetailInclude = {
+  brand: brandInclude,
+  category: categoryInclude,
+  collection: collectionInclude,
+  variants: productDetailVariantsInclude,
+  _count: { select: { variants: true } },
+};
+
+export const productAdminInclude = {
+  brand: brandInclude,
+  category: categoryInclude,
+  collection: collectionInclude,
+  variants: productAdminVariantsInclude,
+  _count: { select: { variants: true } },
+};
+
 export const productCardInclude = {
   brand: brandInclude,
   category: categoryCardInclude,
   collection: collectionInclude,
   variants: productCardVariantsInclude,
-  _count: {
-    select: { variants: true },
-  },
-};
-
-// ============================================================================
-// COMPUTED FIELDS
-// ============================================================================
-
-const getRatings = (product) =>
-  product.variants?.flatMap((v) => v.reviews?.map((r) => r.rating) ?? []) ?? [];
-
-const getAverageRating = (ratings) =>
-  ratings.length
-    ? Number((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1))
-    : 0;
-
-const getPriceRange = (variants = []) => {
-  const prices = variants
-    .map((v) => Number(v.price))
-    .filter((p) => Number.isFinite(p));
-  if (!prices.length) return { min: null, max: null };
-  return { min: Math.min(...prices), max: Math.max(...prices) };
-};
-
-const addComputedFields = (product) => {
-  const ratings = getRatings(product);
-  return {
-    ...product,
-    avgRating: getAverageRating(ratings),
-    totalReviews: ratings.length,
-    priceRange: getPriceRange(product.variants),
-  };
+  _count: { select: { variants: true } },
 };
 
 // ============================================================================
 // CRUD
 // ============================================================================
 
-export const createProduct = (data, tx = prisma) =>
-  tx.product.create({ data, include: productDetailInclude });
+export const createProduct = (data, tx = null) =>
+  db(tx).product.create({ data, include: productDetailInclude });
 
-export const findProductById = (id, tx = prisma) =>
-  tx.product.findUnique({ where: { id }, include: productDetailInclude });
+export const findProductById = (id, tx = null) =>
+  db(tx).product.findUnique({ where: { id }, include: productDetailInclude });
 
-export const findProductBySlug = (slug, tx = prisma) =>
-  tx.product.findUnique({ where: { slug }, include: productDetailInclude });
+export const findProductBySlug = (slug, tx = null) =>
+  db(tx).product.findUnique({ where: { slug }, include: productDetailInclude });
 
-export const updateProduct = (id, data, tx = prisma) =>
-  tx.product.update({ where: { id }, data, include: productDetailInclude });
+export const findProductByIdForAdmin = (id, tx = null) =>
+  db(tx).product.findUnique({ where: { id }, include: productAdminInclude });
 
-export const updateProductStatus = (id, status, tx = prisma) =>
-  tx.product.update({
+export const updateProduct = (id, data, tx = null) =>
+  db(tx).product.update({ where: { id }, data, include: productDetailInclude });
+
+export const updateProductStatus = (id, status, tx = null) =>
+  db(tx).product.update({
     where: { id },
     data: { status },
     include: productDetailInclude,
   });
 
-export const deleteProduct = (id, tx = prisma) =>
-  tx.product.delete({ where: { id } });
+export const deleteProduct = (id, tx = null) =>
+  db(tx).product.delete({ where: { id } });
 
 // ============================================================================
 // LISTS
@@ -195,7 +182,7 @@ export const findProducts = async (
     take = 20,
     includeVariants = true,
   } = {},
-  tx = prisma,
+  tx = null,
 ) => {
   const where = {
     ...(categoryId && { categoryId }),
@@ -234,6 +221,7 @@ export const findProducts = async (
   };
 
   const orderBy = { [sortBy]: sortOrder };
+
   const include = includeVariants
     ? productCardInclude
     : {
@@ -243,12 +231,14 @@ export const findProducts = async (
         _count: { select: { variants: true } },
       };
 
+  const client = db(tx);
+
   const [products, total] = await Promise.all([
-    tx.product.findMany({ where, include, skip, take, orderBy }),
-    tx.product.count({ where }),
+    client.product.findMany({ where, include, skip, take, orderBy }),
+    client.product.count({ where }),
   ]);
 
-  return { products: products.map(addComputedFields), total };
+  return { products, total };
 };
 
 // ============================================================================
@@ -257,9 +247,9 @@ export const findProducts = async (
 
 export const findFeaturedProducts = (
   { limit = 10, categoryId } = {},
-  tx = prisma,
+  tx = null,
 ) =>
-  tx.product.findMany({
+  db(tx).product.findMany({
     where: {
       isFeatured: true,
       status: "ACTIVE",
@@ -270,8 +260,8 @@ export const findFeaturedProducts = (
     take: limit,
   });
 
-export const findNewArrivals = ({ limit = 10, categoryId } = {}, tx = prisma) =>
-  tx.product.findMany({
+export const findNewArrivals = ({ limit = 10, categoryId } = {}, tx = null) =>
+  db(tx).product.findMany({
     where: {
       isNew: true,
       status: "ACTIVE",
@@ -282,8 +272,8 @@ export const findNewArrivals = ({ limit = 10, categoryId } = {}, tx = prisma) =>
     take: limit,
   });
 
-export const findBestSellers = ({ limit = 10, categoryId } = {}, tx = prisma) =>
-  tx.product.findMany({
+export const findBestSellers = ({ limit = 10, categoryId } = {}, tx = null) =>
+  db(tx).product.findMany({
     where: {
       isBestSeller: true,
       status: "ACTIVE",
@@ -298,8 +288,8 @@ export const findBestSellers = ({ limit = 10, categoryId } = {}, tx = prisma) =>
 // RELATIONS
 // ============================================================================
 
-export const getProductVariants = (productId, tx = prisma) =>
-  tx.productVariant.findMany({
+export const getProductVariants = (productId, tx = null) =>
+  db(tx).productVariant.findMany({
     where: { productId },
     include: {
       product: { select: { id: true, name: true, slug: true } },
@@ -309,14 +299,17 @@ export const getProductVariants = (productId, tx = prisma) =>
     orderBy: { createdAt: "asc" },
   });
 
-export const getRelatedProducts = async (productId, limit = 6, tx = prisma) => {
-  const product = await tx.product.findUnique({
+export const getRelatedProducts = async (productId, limit = 6, tx = null) => {
+  const client = db(tx);
+
+  const product = await client.product.findUnique({
     where: { id: productId },
     select: { categoryId: true, brandId: true },
   });
+
   if (!product) return [];
 
-  return tx.product.findMany({
+  return client.product.findMany({
     where: {
       id: { not: productId },
       status: "ACTIVE",
@@ -334,39 +327,73 @@ export const getRelatedProducts = async (productId, limit = 6, tx = prisma) => {
 // ============================================================================
 // VARIANT LOOKUPS
 // ============================================================================
-// Lightweight variant -> productId resolution. Used by callers (e.g. the
-// wishlist service) that only ever receive a variantId from the client and
-// need the owning product's id, without pulling the full
-// productDetailInclude graph.
 
-export const findVariantById = (id, tx = prisma) =>
-  tx.productVariant.findUnique({
+export const findVariantById = (id, tx = null) =>
+  db(tx).productVariant.findUnique({
     where: { id },
     select: { id: true, productId: true, isActive: true },
   });
 
-export const findVariantsByIds = (ids, tx = prisma) =>
-  tx.productVariant.findMany({
+export const findVariantsByIds = (ids, tx = null) =>
+  db(tx).productVariant.findMany({
     where: { id: { in: ids } },
     select: { id: true, productId: true },
   });
 
 // ============================================================================
-// PRODUCT REFERENCE LOOKUPS (lightweight)
+// LIGHTWEIGHT LOOKUPS
 // ============================================================================
-// Cheap existence/status checks against the Product table directly, for
-// callers that may receive either a variantId or a productId (e.g.
-// products with no variants have nothing for the client to select, so it
-// sends the product id itself) and don't need the full include graph.
 
-export const findProductRefById = (id, tx = prisma) =>
-  tx.product.findUnique({
+/**
+ * Minimal product projection for callers that only need identity +
+ * category context (e.g. SKU generation). Avoids productDetailInclude.
+ */
+export const findProductBasicById = (id, tx = null) =>
+  db(tx).product.findUnique({
+    where: { id },
+    select: { id: true, name: true, categoryId: true, status: true },
+  });
+
+/**
+ * Scalar-only product update. Callers that re-read the hydrated product
+ * after commit should use this instead of `updateProduct`, so the write
+ * return value doesn't pay for the full include graph.
+ */
+export const updateProductScalars = (id, data, tx = null) =>
+  db(tx).product.update({ where: { id }, data });
+
+/**
+ * All variants (active AND inactive) with just enough shape to match
+ * incoming ids and collect Cloudinary publicIds for deletions.
+ * `productDetailInclude` filters to active-only, so it cannot be used
+ * for classification during updates.
+ */
+export const findProductVariantsForClassification = (productId, tx = null) =>
+  db(tx).productVariant.findMany({
+    where: { productId },
+    select: {
+      id: true,
+      sku: true,
+      isActive: true,
+      media: { select: { publicId: true } },
+      _count: {
+        select: { orderItems: true, fulfillmentItems: true },
+      },
+    },
+  });
+
+// ============================================================================
+// PRODUCT REFERENCE LOOKUPS
+// ============================================================================
+
+export const findProductRefById = (id, tx = null) =>
+  db(tx).product.findUnique({
     where: { id },
     select: { id: true, status: true },
   });
 
-export const findProductsByIds = (ids, tx = prisma) =>
-  tx.product.findMany({
+export const findProductsByIds = (ids, tx = null) =>
+  db(tx).product.findMany({
     where: { id: { in: ids } },
     select: { id: true, status: true },
   });

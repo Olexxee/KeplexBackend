@@ -1,5 +1,11 @@
+import { BadRequestError } from "../classes/errorClasses.js";
+
 export const parseProductMultipart = (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return next();
+    }
+
     if (typeof req.body.variants === "string") {
       req.body.variants = JSON.parse(req.body.variants);
     }
@@ -16,9 +22,8 @@ export const parseProductMultipart = (req, res, next) => {
       req.body.isBestSeller = req.body.isBestSeller === "true";
     }
 
-    if (req.body.brandId === "") {
-      req.body.brandId = null;
-    }
+    if (req.body.brandId === "") req.body.brandId = null;
+    if (req.body.collectionId === "") req.body.collectionId = null;
 
     next();
   } catch (error) {

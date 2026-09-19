@@ -1,4 +1,3 @@
-// modules/variants/variant.controller.js
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
 import * as variantService from "./variant.service.js";
@@ -38,7 +37,13 @@ export const getProductVariants = asyncWrapper(async (req, res) => {
 });
 
 export const updateVariant = asyncWrapper(async (req, res) => {
-  const variant = await variantService.updateVariant(req.params.id, req.body);
+  const { variant, publicIdsToPurge } = await variantService.updateVariant(
+    req.params.id,
+    req.body,
+  );
+
+  // CDN cleanup runs AFTER the service has committed any DB work.
+  await variantService.purgeMedia(publicIdsToPurge);
 
   return successResponse({
     res,
@@ -48,11 +53,13 @@ export const updateVariant = asyncWrapper(async (req, res) => {
 });
 
 export const updateVariantImages = asyncWrapper(async (req, res) => {
-  // req.body.variantImages is populated by processVariantImages middleware
-  const variant = await variantService.updateVariantImages(
-    req.params.id,
-    req.body.variantImages || [],
-  );
+  const { variant, publicIdsToPurge } =
+    await variantService.updateVariantImages(
+      req.params.id,
+      req.body.variantImages || [],
+    );
+
+  await variantService.purgeMedia(publicIdsToPurge);
 
   return successResponse({
     res,
@@ -62,7 +69,11 @@ export const updateVariantImages = asyncWrapper(async (req, res) => {
 });
 
 export const deleteVariant = asyncWrapper(async (req, res) => {
-  await variantService.deleteVariant(req.params.id);
+  const { publicIdsToPurge } = await variantService.deleteVariant(
+    req.params.id,
+  );
+
+  await variantService.purgeMedia(publicIdsToPurge);
 
   return successResponse({
     res,
@@ -82,5 +93,29 @@ export const bulkCreateVariants = asyncWrapper(async (req, res) => {
     statusCode: 201,
     message: "Variants created successfully",
     data: variants,
+  });
+});
+
+export const archiveVariant = asyncWrapper(async (req, res) => {
+  const { reason } = req.body ?? {};
+  const { publicIdsToPurge } = await variantService.archiveVariant(
+    req.params.id,
+    { reason, archivedBy: req.user?.id },
+  );
+  await variantService.purgeMedia(publicIdsToPurge);
+
+  return successResponse({
+    res,
+    message: "Variant archived successfully",
+    data: { archived: true },
+  });
+});
+
+export const restoreVariant = asyncWrapper(async (req, res) => {
+  const variant = await variantService.restoreVariant(req.params.id);
+  return successResponse({
+    res,
+    message: "Variant restored successfully",
+    data: variant,
   });
 });

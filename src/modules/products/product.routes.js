@@ -20,31 +20,20 @@ import {
   productSlugSchema,
   getProductsQuerySchema,
   updateProductStatusSchema,
+  createSingleVariantSchema,
 } from "./product.validation.js";
 
 const productRouter = Router();
 
 // ============================================================================
-// PUBLIC ROUTES — READ
+// PUBLIC — READ
 // ============================================================================
-
-// --------------------------------------------------------------------------
-// Product catalog
-// GET /api/products
-// --------------------------------------------------------------------------
 
 productRouter.get(
   "/",
   validateQuery(getProductsQuerySchema),
   productController.getProducts,
 );
-
-// --------------------------------------------------------------------------
-// Product collections
-// GET /api/products/featured
-// GET /api/products/new-arrivals
-// GET /api/products/best-sellers
-// --------------------------------------------------------------------------
 
 productRouter.get(
   "/featured",
@@ -64,22 +53,11 @@ productRouter.get(
   productController.getBestSellers,
 );
 
-// --------------------------------------------------------------------------
-// Product by slug
-// IMPORTANT: Must remain before "/:id"
-// GET /api/products/slug/:slug
-// --------------------------------------------------------------------------
-
 productRouter.get(
   "/slug/:slug",
   validateParams(productSlugSchema),
   productController.getProductBySlug,
 );
-
-// --------------------------------------------------------------------------
-// Product related products
-// GET /api/products/:id/related
-// --------------------------------------------------------------------------
 
 productRouter.get(
   "/:id/related",
@@ -88,22 +66,28 @@ productRouter.get(
   productController.getRelatedProducts,
 );
 
-// --------------------------------------------------------------------------
-// Product variants
-// GET /api/products/:id/variants
-// --------------------------------------------------------------------------
-
 productRouter.get(
   "/:id/variants",
   validateParams(productIdSchema),
   productController.getProductVariants,
 );
 
-// --------------------------------------------------------------------------
-// Product by ID
-// IMPORTANT: Keep this LAST among the public GET routes.
-// GET /api/products/:id
-// --------------------------------------------------------------------------
+// ============================================================================
+// ADMIN — READ
+// MUST come before `/:id` so "/admin" isn't captured as an id.
+// ============================================================================
+
+productRouter.get(
+  "/admin/:id",
+  authMiddleware,
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  validateParams(productIdSchema),
+  productController.getAdminProductById,
+);
+
+// ============================================================================
+// PUBLIC — BY ID (LAST among public GETs)
+// ============================================================================
 
 productRouter.get(
   "/:id",
@@ -112,22 +96,13 @@ productRouter.get(
 );
 
 // ============================================================================
-// ADMIN ROUTES — WRITE
+// ADMIN — WRITE
 // ============================================================================
-
-// --------------------------------------------------------------------------
-// Create product
-// POST /api/products
-// --------------------------------------------------------------------------
 
 productRouter.post(
   "/",
   authMiddleware,
-  roleMiddleware(
-    "SUPER_ADMIN",
-    "ADMIN",
-    "STAFF",
-  ),
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   uploadVariantImages,
   processVariantImages,
   parseProductMultipart,
@@ -135,19 +110,22 @@ productRouter.post(
   productController.createProduct,
 );
 
-// --------------------------------------------------------------------------
-// Update product
-// PATCH /api/products/:id
-// --------------------------------------------------------------------------
+productRouter.post(
+  "/:id/variants",
+  authMiddleware,
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  uploadVariantImages,
+  processVariantImages,
+  parseProductMultipart,
+  validateParams(productIdSchema),
+  validateBody(createSingleVariantSchema),
+  productController.createVariantForProduct,
+);
 
 productRouter.patch(
   "/:id",
   authMiddleware,
-  roleMiddleware(
-    "SUPER_ADMIN",
-    "ADMIN",
-    "STAFF",
-  ),
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   uploadVariantImages,
   processVariantImages,
   parseProductMultipart,
@@ -156,38 +134,24 @@ productRouter.patch(
   productController.updateProduct,
 );
 
-// --------------------------------------------------------------------------
-// Update product status
-// PATCH /api/products/:id/status
-// --------------------------------------------------------------------------
-
 productRouter.patch(
   "/:id/status",
   authMiddleware,
-  roleMiddleware(
-    "SUPER_ADMIN",
-    "ADMIN",
-    "STAFF",
-  ),
+  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
   validateParams(productIdSchema),
   validateBody(updateProductStatusSchema),
   productController.updateProductStatus,
 );
 
-// --------------------------------------------------------------------------
-// Delete product
-// DELETE /api/products/:id
-// --------------------------------------------------------------------------
-
+// DELETE archives (soft if history, hard if not). This matches the
+// frontend's `deleteProduct` / `archiveProduct` client, which both call
+// DELETE with an optional `reason` body.
 productRouter.delete(
   "/:id",
   authMiddleware,
-  roleMiddleware(
-    "SUPER_ADMIN",
-    "ADMIN",
-  ),
+  roleMiddleware("SUPER_ADMIN", "ADMIN"),
   validateParams(productIdSchema),
-  productController.deleteProduct,
+  productController.archiveProduct,
 );
 
 export default productRouter;

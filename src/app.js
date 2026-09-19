@@ -25,7 +25,8 @@ import trainingRouter from "./modules/training-programs/trainingProgram.routes.j
 import registrationRouter from "./modules/registration/registration.routes.js";
 import auditRouter from "./modules/audit/audit.routes.js";
 import productRouter from "./modules/products/product.routes.js";
-import shippingRouter from "./modules/shipping/shipping.routes.js"
+import shippingRouter from "./modules/shipping/shipping.routes.js";
+import variantRouter from "./modules/variants/variant.routes.js";
 import reviewRouter from "./modules/reviews/review.routes.js";
 import wishlistRouter from "./modules/wishlist/wishlist.routes.js";
 import warehouseRouter from "./modules/warehouse/warehouse.routes.js";
@@ -130,6 +131,7 @@ app.use("/api/business-config", configRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/testimonial", testimonialRouter);
 app.use("/api/products", productRouter);
+app.use("/api/variants", variantRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/shipping", shippingRouter);
 app.use("/api/warehouses", warehouseRouter)

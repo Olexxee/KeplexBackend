@@ -5,6 +5,7 @@ import {
 } from "../../lib/pagination.js";
 import { productEngine } from "./product.engine.service.js";
 import * as productDb from "./product.db.js";
+import * as productAggregateService from "./product.aggregate.service.js";
 
 // ============================================================================
 // LIST
@@ -76,13 +77,15 @@ export const getProducts = async (filters = {}) => {
 // BY ID
 // ============================================================================
 
-export const getProductById = async (id) => {
-  const product = await productDb.findProductById(id);
+export const getProductById = async (
+  id,
+  { includeInactiveVariants = false } = {},
+) => {
+  const product = includeInactiveVariants
+    ? await productDb.findProductByIdForAdmin(id)
+    : await productDb.findProductById(id);
 
-  if (!product) {
-    throw new NotFoundError("Product not found");
-  }
-
+  if (!product) throw new NotFoundError("Product not found");
   return product;
 };
 
@@ -103,6 +106,9 @@ export const getProductBySlug = async (slug) => {
 // ============================================================================
 // CONTEXT
 // ============================================================================
+// The controller's single entry point for catalog / homepage / product-detail
+// reads. This is the service's boundary in front of product.engine.service.js
+// — the controller should never import the engine directly.
 
 export const getProductsByContext = async ({ context, filters, options }) => {
   return productEngine.getProducts({
@@ -118,6 +124,24 @@ export const getProductsByContext = async ({ context, filters, options }) => {
 
 export const getFeaturedProducts = async (filters = {}) => {
   return productDb.findFeaturedProducts(filters);
+};
+
+// ============================================================================
+// ADMIN — READ (all variants, active + inactive)
+// ============================================================================
+
+export const getProductByIdForAdmin = async (id) => {
+  const product = await productDb.findProductByIdForAdmin(id);
+  if (!product) throw new NotFoundError("Product not found");
+  return product;
+};
+
+// ============================================================================
+// VARIANTS — SINGLE
+// ============================================================================
+
+export const createVariant = (payload) => {
+  return variantService.createVariant(payload);
 };
 
 // ============================================================================
@@ -162,4 +186,35 @@ export const getProductVariants = async (productId) => {
   }
 
   return productDb.getProductVariants(productId);
+};
+
+// ============================================================================
+// ADMIN — WRITE
+// ============================================================================
+// This is the ONLY module that imports product.aggregate.service.js.
+// The controller talks to product.service.js exclusively; it never reaches
+// into the aggregate service (or the engine, above) directly. Keeping these
+// as thin passthroughs — rather than re-exporting the aggregate module —
+// means the service can grow cross-cutting concerns (logging, caching,
+// authorization checks that don't belong in the aggregate) later without
+// touching the controller.
+
+export const createProduct = (payload) => {
+  return productAggregateService.createProductAggregate(payload);
+};
+
+export const updateProduct = (id, payload) => {
+  return productAggregateService.updateProductAggregate(id, payload);
+};
+
+export const updateProductStatus = (id, status) => {
+  return productAggregateService.updateProductStatusAggregate(id, status);
+};
+
+export const archiveProduct = (id, options) => {
+  return productAggregateService.archiveProductAggregate(id, options);
+};
+
+export const deleteProduct = (id) => {
+  return productAggregateService.deleteProductAggregate(id);
 };
