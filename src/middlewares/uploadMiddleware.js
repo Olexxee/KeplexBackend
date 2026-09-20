@@ -38,3 +38,5 @@ export const uploadVariantImages = upload.array("variantImages", 5);
 
 // Product hero image upload
 export const uploadHeroImage = upload.single("heroImage");
+
+export const uploadReviewImages = upload.array("reviewImages", 3);

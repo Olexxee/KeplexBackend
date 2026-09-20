@@ -645,7 +645,6 @@ model Review {
   rating          Int          @default(5)
   title           String?
   comment         String?
-  images          Json?
   isVerified      Boolean      @default(false)
   status          ReviewStatus @default(PENDING)
   helpfulCount    Int          @default(0)
@@ -653,14 +652,36 @@ model Review {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  variant   ProductVariant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  order     Order?           @relation(fields: [orderId], references: [id])
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order     Order?         @relation(fields: [orderId], references: [id])
+  images    ReviewImage[]
   responses ReviewResponse[]
 
+  @@unique([userId, variantId])
   @@index([userId])
   @@index([variantId])
   @@index([status])
+  @@index([orderId])
+}
+
+model ReviewImage {
+  id        String   @id @default(cuid())
+  reviewId  String
+  url       String
+  publicId  String
+  mimeType  String?
+  bytes     Int?
+  format    String?
+  width     Int?
+  height    Int?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([reviewId, sortOrder])
 }
 
 model ReviewResponse {

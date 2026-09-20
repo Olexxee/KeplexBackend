@@ -1,52 +1,36 @@
 import { prisma } from "../../config/prisma.js";
-import {
-  NotFoundError,
-  BadRequestError,
-} from "../../classes/errorClasses.js";
+import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
 import * as checkoutService from "../checkout/checkout.service.js";
 import * as orderDb from "./order.db.js";
 import * as auditDb from "../audit/audit.service.js";
-import { assertValidTransition } from "./order.state.js";
+import {
+  assertValidTransition,
+  isTerminalState,
+  requiresStockRestore,
+} from "./order.state.js";
 import {
   getPaginationParams,
   formatPaginatedResponse,
 } from "../../lib/pagination.js";
 
-
-
 // ============================================================
 // ORDERS
 // ============================================================
 
-export const getMyOrders = async (
-  userId,
-  filters,
-) => {
-  const {
-    page,
-    limit,
+export const getMyOrders = async (userId, filters) => {
+  const { page, limit, status, search, startDate, endDate } = filters;
+
+  const { skip, take } = getPaginationParams(page, limit);
+
+  const [data, total] = await orderDb.findOrders({
+    userId,
     status,
     search,
     startDate,
     endDate,
-  } = filters;
-
-  const { skip, take } =
-    getPaginationParams(
-      page,
-      limit,
-    );
-
-  const [data, total] =
-    await orderDb.findOrders({
-      userId,
-      status,
-      search,
-      startDate,
-      endDate,
-      skip,
-      take,
-    });
+    skip,
+    take,
+  });
 
   return formatPaginatedResponse({
     data,
@@ -56,35 +40,20 @@ export const getMyOrders = async (
   });
 };
 
-export const getAllOrders = async (
-  filters,
-) => {
-  const {
-    page,
-    limit,
+export const getAllOrders = async (filters) => {
+  const { page, limit, status, userId, search, startDate, endDate } = filters;
+
+  const { skip, take } = getPaginationParams(page, limit);
+
+  const [data, total] = await orderDb.findOrders({
     status,
     userId,
     search,
     startDate,
     endDate,
-  } = filters;
-
-  const { skip, take } =
-    getPaginationParams(
-      page,
-      limit,
-    );
-
-  const [data, total] =
-    await orderDb.findOrders({
-      status,
-      userId,
-      search,
-      startDate,
-      endDate,
-      skip,
-      take,
-    });
+    skip,
+    take,
+  });
 
   return formatPaginatedResponse({
     data,
@@ -98,65 +67,37 @@ export const getAllOrders = async (
 // SINGLE ORDER
 // ============================================================
 
-export const getOrderById = async (
-  id,
-  user,
-) => {
-  const order =
-    await orderDb.findOrderById(id);
+export const getOrderById = async (id, user) => {
+  const order = await orderDb.findOrderById(id);
 
   if (!order) {
-    throw new NotFoundError(
-      "Order not found",
-    );
+    throw new NotFoundError("Order not found");
   }
 
-  const isOwner =
-    order.userId === user.id;
+  const isOwner = order.userId === user.id;
 
-  const isAdmin = [
-    "SUPER_ADMIN",
-    "ADMIN",
-    "STAFF",
-  ].includes(user.role);
+  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
 
   if (!isOwner && !isAdmin) {
-    throw new NotFoundError(
-      "Order not found",
-    );
+    throw new NotFoundError("Order not found");
   }
 
   return order;
 };
 
-export const getOrderByOrderNumber = async (
-  orderNumber,
-  user,
-) => {
-  const order =
-    await orderDb.findOrderByOrderNumber(
-      orderNumber,
-    );
+export const getOrderByOrderNumber = async (orderNumber, user) => {
+  const order = await orderDb.findOrderByOrderNumber(orderNumber);
 
   if (!order) {
-    throw new NotFoundError(
-      "Order not found",
-    );
+    throw new NotFoundError("Order not found");
   }
 
-  const isOwner =
-    order.userId === user.id;
+  const isOwner = order.userId === user.id;
 
-  const isAdmin = [
-    "SUPER_ADMIN",
-    "ADMIN",
-    "STAFF",
-  ].includes(user.role);
+  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
 
   if (!isOwner && !isAdmin) {
-    throw new NotFoundError(
-      "Order not found",
-    );
+    throw new NotFoundError("Order not found");
   }
 
   return order;
@@ -166,140 +107,94 @@ export const getOrderByOrderNumber = async (
 // ORDER STATUS
 // ============================================================
 
-export const updateOrderStatus = async (
-  id,
-  status,
-  userId,
-) => {
-  return prisma.$transaction(
+export const updateOrderStatus = async (id, status, userId) => {
+  // Keep the transaction lean: every query inside it holds the connection
+  // and counts against the timeout. Heavy reads (the full order include)
+  // happen AFTER commit.
+  await prisma.$transaction(
     async (tx) => {
-      const order =
-        await tx.order.findUnique({
-          where: {
-            id,
-          },
-
-          include: {
-            items: {
-              include: {
-                variant: true,
-              },
-            },
-          },
-        });
+      const order = await orderDb.findOrderForStatusChange(id, tx);
 
       if (!order) {
-        throw new NotFoundError(
-          "Order not found",
-        );
+        throw new NotFoundError("Order not found");
       }
 
-      // ------------------------------------------------------
+      // ----------------------------------------------------
       // TERMINAL STATES
-      // ------------------------------------------------------
+      // ----------------------------------------------------
 
-      if (
-        order.status ===
-        "COMPLETED"
-      ) {
+      if (isTerminalState(order.status)) {
         throw new BadRequestError(
-          "Completed orders are immutable",
+          order.status === "COMPLETED"
+            ? "Completed orders are immutable"
+            : "Cancelled orders are immutable",
         );
       }
 
-      if (
-        order.status ===
-        "CANCELLED"
-      ) {
-        throw new BadRequestError(
-          "Cancelled orders are immutable",
-        );
-      }
-
-      // ------------------------------------------------------
+      // ----------------------------------------------------
       // STATE MACHINE
-      // ------------------------------------------------------
+      // ----------------------------------------------------
 
-      assertValidTransition(
+      assertValidTransition(order.status, status);
+
+      // ----------------------------------------------------
+      // UPDATE (guarded against concurrent status changes)
+      // ----------------------------------------------------
+
+      const transitioned = await orderDb.transitionOrderStatus(
+        id,
         order.status,
         status,
+        tx,
       );
 
-      // ------------------------------------------------------
-      // RESTORE STOCK ON CANCELLATION
-      // ------------------------------------------------------
-
-      if (
-        status === "CANCELLED"
-      ) {
-        for (const item of order.items) {
-          await orderDb.restoreOrderItemStock(
-            {
-              variantId:
-                item.variantId,
-
-              quantity:
-                item.quantity,
-            },
-            tx,
-          );
-        }
+      if (!transitioned) {
+        throw new BadRequestError(
+          "Order status was changed by another request. Refresh and try again.",
+        );
       }
 
-      // ------------------------------------------------------
-      // UPDATE ORDER
-      // ------------------------------------------------------
+      // ----------------------------------------------------
+      // RESTORE STOCK ON CANCELLATION
+      // ----------------------------------------------------
 
-      const updatedOrder =
-        await orderDb.updateOrderStatusTx(
-          id,
-          {
-            status,
-          },
-          tx,
-        );
+      if (requiresStockRestore(status)) {
+        await orderDb.restoreStockForItems(order.items, tx);
+      }
 
-      // ------------------------------------------------------
+      // ----------------------------------------------------
       // AUDIT
-      // ------------------------------------------------------
+      // ----------------------------------------------------
 
-      await auditDb.createAuditLog(
+      await auditDb.logAudit(
         {
           userId,
-
-          action:
-            "ORDER_STATUS_CHANGE",
-
-          entity:
-            "Order",
-
-          entityId:
-            id,
-
+          action: "ORDER_STATUS_CHANGE",
+          entity: "Order",
+          entityId: id,
           metadata: {
-            from:
-              order.status,
-
-            to:
-              status,
+            from: order.status,
+            to: status,
           },
         },
         tx,
       );
-
-      return updatedOrder;
+    },
+    {
+      maxWait: 10_000,
+      timeout: 20_000,
     },
   );
+
+  // Full order payload, fetched outside the transaction
+  return orderDb.findOrderById(id);
 };
 
 // ============================================================
 // CHECKOUT
 // ============================================================
 
-export const checkout = async ({
-  userId,
-  payload,
-}) => {
+export const checkout = async ({ userId, payload }) => {
   return checkoutService.checkout({
     userId,
     payload,
@@ -310,46 +205,28 @@ export const checkout = async ({
 // ORDER TIMELINE
 // ============================================================
 
-export const getOrderTimeline = async (
-  orderId,
-  user,
-) => {
-  const order =
-    await orderDb.findOrderById(
-      orderId,
-    );
+export const getOrderTimeline = async (orderId, user) => {
+  const order = await orderDb.findOrderById(orderId);
 
   if (!order) {
-    throw new NotFoundError(
-      "Order not found",
-    );
+    throw new NotFoundError("Order not found");
   }
 
-  const isOwner =
-    order.userId === user.id;
+  const isOwner = order.userId === user.id;
 
-  const isAdmin = [
-    "SUPER_ADMIN",
-    "ADMIN",
-    "STAFF",
-  ].includes(user.role);
+  const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
 
   if (!isOwner && !isAdmin) {
-    throw new NotFoundError(
-      "Order not found",
-    );
+    throw new NotFoundError("Order not found");
   }
 
   const timeline = [
     {
-      status:
-        "ORDER_CREATED",
+      status: "ORDER_CREATED",
 
-      timestamp:
-        order.createdAt,
+      timestamp: order.createdAt,
 
-      description:
-        "Order created",
+      description: "Order created",
     },
   ];
 
@@ -357,28 +234,19 @@ export const getOrderTimeline = async (
   // STATUS EVENTS
   // ----------------------------------------------------------
 
-  const auditLogs =
-    await orderDb.findOrderAuditLogs(
-      orderId,
-    );
+  const auditLogs = await orderDb.findOrderAuditLogs(orderId);
 
   for (const log of auditLogs) {
-    const metadata =
-      log.metadata || {};
+    const metadata = log.metadata || {};
 
     timeline.push({
-      status:
-        metadata.to ||
-        "STATUS_CHANGED",
+      status: metadata.to || "STATUS_CHANGED",
 
-      timestamp:
-        log.createdAt,
+      timestamp: log.createdAt,
 
-      description:
-        `Order status changed from ${metadata.from} to ${metadata.to}`,
+      description: `Order status changed from ${metadata.from} to ${metadata.to}`,
 
-      metadata:
-        log.metadata,
+      metadata: log.metadata,
     });
   }
 
@@ -386,31 +254,22 @@ export const getOrderTimeline = async (
   // PAYMENT EVENTS
   // ----------------------------------------------------------
 
-  const payments =
-    await orderDb.findOrderPayments(
-      orderId,
-    );
+  const payments = await orderDb.findOrderPayments(orderId);
 
   for (const payment of payments) {
     timeline.push({
-      status:
-        `PAYMENT_${payment.status}`,
+      status: `PAYMENT_${payment.status}`,
 
-      timestamp:
-        payment.createdAt,
+      timestamp: payment.createdAt,
 
-      description:
-        `Payment ${payment.status.toLowerCase()}: ${payment.reference}`,
+      description: `Payment ${payment.status.toLowerCase()}: ${payment.reference}`,
 
       metadata: {
-        amount:
-          payment.amount,
+        amount: payment.amount,
 
-        provider:
-          payment.provider,
+        provider: payment.provider,
 
-        reference:
-          payment.reference,
+        reference: payment.reference,
       },
     });
   }
@@ -419,31 +278,22 @@ export const getOrderTimeline = async (
   // FULFILLMENT EVENTS
   // ----------------------------------------------------------
 
-  const fulfillments =
-    await orderDb.findOrderFulfillments(
-      orderId,
-    );
+  const fulfillments = await orderDb.findOrderFulfillments(orderId);
 
   for (const fulfillment of fulfillments) {
     timeline.push({
-      status:
-        `FULFILLMENT_${fulfillment.status}`,
+      status: `FULFILLMENT_${fulfillment.status}`,
 
-      timestamp:
-        fulfillment.createdAt,
+      timestamp: fulfillment.createdAt,
 
-      description:
-        `Fulfillment ${fulfillment.status.toLowerCase()}: ${fulfillment.type}`,
+      description: `Fulfillment ${fulfillment.status.toLowerCase()}: ${fulfillment.type}`,
 
       metadata: {
-        type:
-          fulfillment.type,
+        type: fulfillment.type,
 
-        trackingNumber:
-          fulfillment.trackingNumber,
+        trackingNumber: fulfillment.trackingNumber,
 
-        carrier:
-          fulfillment.carrier,
+        carrier: fulfillment.carrier,
       },
     });
   }
@@ -452,11 +302,7 @@ export const getOrderTimeline = async (
   // SORT
   // ----------------------------------------------------------
 
-  timeline.sort(
-    (a, b) =>
-      new Date(a.timestamp) -
-      new Date(b.timestamp),
-  );
+  timeline.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
   return timeline;
 };
@@ -465,141 +311,83 @@ export const getOrderTimeline = async (
 // ORDER CBM UPDATE
 // ============================================================
 
-export const updateOrderCBM = async (
-  orderId,
-  cbmData,
-  adminUserId,
-) => {
-  return prisma.$transaction(
+export const updateOrderCBM = async (orderId, cbmData, adminUserId) => {
+  // ------------------------------------------------------
+  // VALIDATION (no DB needed, so do it before opening a transaction)
+  // ------------------------------------------------------
+
+  const totalCBM = Number(cbmData?.totalCBM);
+
+  const chargeableWeight = Number(
+    cbmData?.totalChargeableWeight ?? cbmData?.chargeableWeight,
+  );
+
+  if (!Number.isFinite(totalCBM) || totalCBM < 0) {
+    throw new BadRequestError("Invalid CBM data");
+  }
+
+  if (!Number.isFinite(chargeableWeight) || chargeableWeight < 0) {
+    throw new BadRequestError("Invalid chargeable weight");
+  }
+
+  await prisma.$transaction(
     async (tx) => {
-      const order =
-        await tx.order.findUnique({
-          where: {
-            id: orderId,
-          },
-        });
+      const order = await orderDb.findOrderCBMSnapshot(orderId, tx);
 
       if (!order) {
-        throw new NotFoundError(
-          "Order not found",
-        );
+        throw new NotFoundError("Order not found");
       }
 
-      // ------------------------------------------------------
-      // VALIDATION
-      // ------------------------------------------------------
-
-      const totalCBM =
-        Number(cbmData?.totalCBM);
-
-      const chargeableWeight =
-        Number(
-          cbmData?.totalChargeableWeight ??
-            cbmData?.chargeableWeight,
-        );
-
-      if (
-        !Number.isFinite(totalCBM) ||
-        totalCBM < 0
-      ) {
-        throw new BadRequestError(
-          "Invalid CBM data",
-        );
-      }
-
-      if (
-        !Number.isFinite(
-          chargeableWeight,
-        ) ||
-        chargeableWeight < 0
-      ) {
-        throw new BadRequestError(
-          "Invalid chargeable weight",
-        );
-      }
-
-      // ------------------------------------------------------
-      // UPDATE
-      // ------------------------------------------------------
-
-      const updatedOrder =
-        await orderDb.updateOrderCBM(
-          orderId,
-          {
-            cbm: totalCBM,
-
-            chargeableWeight,
-
-            cbmData,
-
-            cbmUpdatedAt:
-              new Date(),
-
-            cbmUpdatedBy:
-              adminUserId,
-          },
-          tx,
-        );
-
-      // ------------------------------------------------------
-      // AUDIT
-      // ------------------------------------------------------
-
-      await auditDb.createAuditLog(
+      await orderDb.updateOrderCBM(
+        orderId,
         {
-          userId:
-            adminUserId,
-
-          action:
-            "ORDER_CBM_UPDATE",
-
-          entity:
-            "Order",
-
-          entityId:
-            orderId,
-
-          metadata: {
-            previousCBM:
-              order.cbm,
-
-            newCBM:
-              totalCBM,
-
-            previousChargeableWeight:
-              order.chargeableWeight,
-
-            newChargeableWeight:
-              chargeableWeight,
-
-            data:
-              cbmData,
-          },
+          cbm: totalCBM,
+          chargeableWeight,
+          cbmData,
+          cbmUpdatedAt: new Date(),
+          cbmUpdatedBy: adminUserId,
         },
         tx,
       );
 
-      return updatedOrder;
+      await auditDb.createAuditLog(
+        {
+          userId: adminUserId,
+          action: "ORDER_CBM_UPDATE",
+          entity: "Order",
+          entityId: orderId,
+          metadata: {
+            previousCBM: order.cbm,
+            newCBM: totalCBM,
+            previousChargeableWeight: order.chargeableWeight,
+            newChargeableWeight: chargeableWeight,
+            data: cbmData,
+          },
+        },
+        tx,
+      );
+    },
+    {
+      maxWait: 10_000,
+      timeout: 20_000,
     },
   );
+
+  return orderDb.findOrderById(orderId);
 };
 
 // ============================================================
 // METRICS
 // ============================================================
 
-export const getOrderMetrics =
-  async () => {
-    return orderDb.getOrderMetrics();
-  };
+export const getOrderMetrics = async () => {
+  return orderDb.getOrderMetrics();
+};
 
 // ============================================================
 // FULFILLMENT TYPE
 // ============================================================
 
-export const getOrdersByFulfillmentType =
-  async (fulfillmentType) => {
-    return orderDb.findOrdersByFulfillmentType(
-      fulfillmentType,
-    );
-  };
+export const getOrdersByFulfillmentType = async (fulfillmentType) => {
+  return orderDb.findOrdersByFulfillmentType(fulfillmentType);
+};

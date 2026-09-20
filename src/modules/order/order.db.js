@@ -70,14 +70,9 @@ const orderInclude = {
 // ============================================================
 
 export const generateOrderNumber = () => {
-  const timestamp = Date.now()
-    .toString(36)
-    .toUpperCase();
+  const timestamp = Date.now().toString(36).toUpperCase();
 
-  const random = Math.random()
-    .toString(36)
-    .substring(2, 6)
-    .toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
 
   return `KEP-${timestamp}-${random}`;
 };
@@ -86,10 +81,7 @@ export const generateOrderNumber = () => {
 // CART
 // ============================================================
 
-export const findActiveCartForCheckout = async (
-  userId,
-  tx = prisma,
-) => {
+export const findActiveCartForCheckout = async (userId, tx = prisma) => {
   return tx.cart.findFirst({
     where: {
       userId,
@@ -128,43 +120,25 @@ export const createOrderFromCart = async (
   tx = prisma,
 ) => {
   const subtotal = cart.items.reduce(
-    (sum, item) =>
-      sum +
-      Number(item.unitPriceSnapshot) *
-        Number(item.quantity),
+    (sum, item) => sum + Number(item.unitPriceSnapshot) * Number(item.quantity),
     0,
   );
 
-  const calculatedItems = Array.isArray(
-    itemsWithCBM,
-  )
-    ? itemsWithCBM
-    : [];
+  const calculatedItems = Array.isArray(itemsWithCBM) ? itemsWithCBM : [];
 
   const totalCBM = calculatedItems.reduce(
-    (sum, item) =>
-      sum + Number(item.cbm || 0),
+    (sum, item) => sum + Number(item.cbm || 0),
     0,
   );
 
-  const totalChargeableWeight =
-    calculatedItems.reduce(
-      (sum, item) =>
-        sum +
-        Number(
-          item.chargeableWeight || 0,
-        ),
-      0,
-    );
-
-  const normalizedCBM = Number(
-    totalCBM.toFixed(4),
+  const totalChargeableWeight = calculatedItems.reduce(
+    (sum, item) => sum + Number(item.chargeableWeight || 0),
+    0,
   );
 
-  const normalizedChargeableWeight =
-    Number(
-      totalChargeableWeight.toFixed(2),
-    );
+  const normalizedCBM = Number(totalCBM.toFixed(4));
+
+  const normalizedChargeableWeight = Number(totalChargeableWeight.toFixed(2));
 
   return tx.order.create({
     data: {
@@ -174,40 +148,31 @@ export const createOrderFromCart = async (
 
       userId,
 
-      orderNumber:
-        generateOrderNumber(),
+      orderNumber: generateOrderNumber(),
 
       // ------------------------------------------------------
       // CUSTOMER SNAPSHOT
       // ------------------------------------------------------
 
-      customerName:
-        address.fullName,
+      customerName: address.fullName,
 
-      customerEmail:
-        address.email || null,
+      customerEmail: address.email || null,
 
-      customerPhone:
-        address.phone,
+      customerPhone: address.phone,
 
       // ------------------------------------------------------
       // SHIPPING ADDRESS SNAPSHOT
       // ------------------------------------------------------
 
-      shippingLabel:
-        address.label || null,
+      shippingLabel: address.label || null,
 
-      shippingStreet:
-        address.addressLine,
+      shippingStreet: address.addressLine,
 
-      shippingCity:
-        address.city,
+      shippingCity: address.city,
 
-      shippingState:
-        address.state || null,
+      shippingState: address.state || null,
 
-      shippingCountry:
-        address.country || "NG",
+      shippingCountry: address.country || "NG",
 
       // ------------------------------------------------------
       // FINANCIALS
@@ -215,14 +180,11 @@ export const createOrderFromCart = async (
 
       subtotal,
 
-      shippingCost:
-        Number(shippingCost || 0),
+      shippingCost: Number(shippingCost || 0),
 
-      taxAmount:
-        Number(taxAmount || 0),
+      taxAmount: Number(taxAmount || 0),
 
-      totalAmount:
-        Number(totalAmount),
+      totalAmount: Number(totalAmount),
 
       // ------------------------------------------------------
       // ORDER STATE
@@ -230,142 +192,77 @@ export const createOrderFromCart = async (
 
       status: "PENDING",
 
-      notes:
-        payload.notes || null,
+      notes: payload.notes || null,
 
       // ------------------------------------------------------
       // SHIPPING METRICS
       // ------------------------------------------------------
 
-      cbm:
-        normalizedCBM,
+      cbm: normalizedCBM,
 
-      chargeableWeight:
-        normalizedChargeableWeight,
+      chargeableWeight: normalizedChargeableWeight,
 
       cbmData: {
-        totalCBM:
-          normalizedCBM,
+        totalCBM: normalizedCBM,
 
-        totalChargeableWeight:
-          normalizedChargeableWeight,
+        totalChargeableWeight: normalizedChargeableWeight,
 
-        items: calculatedItems.map(
-          (item) => ({
-            variantId:
-              item.variantId,
+        items: calculatedItems.map((item) => ({
+          variantId: item.variantId,
 
-            quantity:
-              Number(
-                item.quantity || 0,
-              ),
+          quantity: Number(item.quantity || 0),
 
-            cbm:
-              Number(
-                item.cbm || 0,
-              ),
+          cbm: Number(item.cbm || 0),
 
-            actualWeight:
-              Number(
-                item.actualWeight || 0,
-              ),
+          actualWeight: Number(item.actualWeight || 0),
 
-            volumetricWeight:
-              Number(
-                item.volumetricWeight || 0,
-              ),
+          volumetricWeight: Number(item.volumetricWeight || 0),
 
-            chargeableWeight:
-              Number(
-                item.chargeableWeight ||
-                  0,
-              ),
+          chargeableWeight: Number(item.chargeableWeight || 0),
 
-            shippingType:
-              item.shippingType ||
-              "LOCAL",
+          shippingType: item.shippingType || "LOCAL",
 
-            dimensions: {
-              length:
-                item.length != null
-                  ? Number(
-                      item.length,
-                    )
-                  : null,
+          dimensions: {
+            length: item.length != null ? Number(item.length) : null,
 
-              width:
-                item.width != null
-                  ? Number(
-                      item.width,
-                    )
-                  : null,
+            width: item.width != null ? Number(item.width) : null,
 
-              height:
-                item.height != null
-                  ? Number(
-                      item.height,
-                    )
-                  : null,
-            },
-          }),
-        ),
+            height: item.height != null ? Number(item.height) : null,
+          },
+        })),
       },
 
       // ------------------------------------------------------
       // FULFILLMENT GROUPS
       // ------------------------------------------------------
 
-      fulfillmentGroups:
-        payload.fulfillmentGroups ||
-        null,
+      fulfillmentGroups: payload.fulfillmentGroups || null,
 
       // ------------------------------------------------------
       // ORDER ITEMS
       // ------------------------------------------------------
 
       items: {
-        create: cart.items.map(
-          (cartItem) => {
-            const itemCBM =
-              calculatedItems.find(
-                (item) =>
-                  item.variantId ===
-                  cartItem.variantId,
-              );
+        create: cart.items.map((cartItem) => {
+          const itemCBM = calculatedItems.find(
+            (item) => item.variantId === cartItem.variantId,
+          );
 
-            return {
-              variantId:
-                cartItem.variantId,
+          return {
+            variantId: cartItem.variantId,
 
-              quantity:
-                Number(
-                  cartItem.quantity,
-                ),
+            quantity: Number(cartItem.quantity),
 
-              unitPriceSnapshot:
-                cartItem.unitPriceSnapshot,
+            unitPriceSnapshot: cartItem.unitPriceSnapshot,
 
-              totalPrice:
-                Number(
-                  cartItem.unitPriceSnapshot,
-                ) *
-                Number(
-                  cartItem.quantity,
-                ),
+            totalPrice:
+              Number(cartItem.unitPriceSnapshot) * Number(cartItem.quantity),
 
-              cbm:
-                Number(
-                  itemCBM?.cbm || 0,
-                ),
+            cbm: Number(itemCBM?.cbm || 0),
 
-              chargeableWeight:
-                Number(
-                  itemCBM?.chargeableWeight ||
-                    0,
-                ),
-            };
-          },
-        ),
+            chargeableWeight: Number(itemCBM?.chargeableWeight || 0),
+          };
+        }),
       },
     },
   });
@@ -448,8 +345,7 @@ export const findOrders = async ({
             variant: {
               include: {
                 media: {
-                  select:
-                    variantMediaSelect,
+                  select: variantMediaSelect,
                 },
 
                 product: {
@@ -508,10 +404,7 @@ export const findOrders = async ({
 // SINGLE ORDER
 // ============================================================
 
-export const findOrderById = async (
-  id,
-  tx = prisma,
-) => {
+export const findOrderById = async (id, tx = prisma) => {
   return tx.order.findUnique({
     where: {
       id,
@@ -521,10 +414,7 @@ export const findOrderById = async (
   });
 };
 
-export const findOrderByOrderNumber = async (
-  orderNumber,
-  tx = prisma,
-) => {
+export const findOrderByOrderNumber = async (orderNumber, tx = prisma) => {
   return tx.order.findUnique({
     where: {
       orderNumber,
@@ -538,11 +428,45 @@ export const findOrderByOrderNumber = async (
 // ORDER STATUS
 // ============================================================
 
-export const updateOrderStatus = async (
+// Lean read for status changes: only what the transition + stock restore need.
+export const findOrderForStatusChange = async (id, tx = prisma) => {
+  return tx.order.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      items: {
+        select: {
+          variantId: true,
+          quantity: true,
+        },
+      },
+    },
+  });
+};
+
+// Optimistic guard: only succeeds if the order is still in `fromStatus`.
+// Returns true when exactly one row was updated.
+export const transitionOrderStatus = async (
   id,
-  status,
+  fromStatus,
+  toStatus,
   tx = prisma,
 ) => {
+  const result = await tx.order.updateMany({
+    where: {
+      id,
+      status: fromStatus,
+    },
+    data: {
+      status: toStatus,
+    },
+  });
+
+  return result.count === 1;
+};
+
+export const updateOrderStatus = async (id, status, tx = prisma) => {
   return tx.order.update({
     where: {
       id,
@@ -556,11 +480,7 @@ export const updateOrderStatus = async (
   });
 };
 
-export const updateOrderStatusTx = async (
-  id,
-  data,
-  tx = prisma,
-) => {
+export const updateOrderStatusTx = async (id, data, tx = prisma) => {
   return tx.order.update({
     where: {
       id,
@@ -577,10 +497,7 @@ export const updateOrderStatusTx = async (
 // ============================================================
 
 export const decrementVariantStock = async (
-  {
-    variantId,
-    quantity,
-  },
+  { variantId, quantity },
   tx = prisma,
 ) => {
   return tx.productVariant.updateMany({
@@ -601,10 +518,7 @@ export const decrementVariantStock = async (
 };
 
 export const restoreOrderItemStock = async (
-  {
-    variantId,
-    quantity,
-  },
+  { variantId, quantity },
   tx = prisma,
 ) => {
   return tx.productVariant.update({
@@ -620,15 +534,39 @@ export const restoreOrderItemStock = async (
   });
 };
 
+// Restores stock for many order items, merging duplicate variants first
+// so each variant costs exactly one query.
+export const restoreStockForItems = async (items, tx = prisma) => {
+  const totals = new Map();
+
+  for (const item of items) {
+    totals.set(
+      item.variantId,
+      (totals.get(item.variantId) || 0) + Number(item.quantity),
+    );
+  }
+
+  for (const [variantId, quantity] of totals) {
+    await restoreOrderItemStock({ variantId, quantity }, tx);
+  }
+};
+
 // ============================================================
 // ORDER CBM
 // ============================================================
 
-export const updateOrderCBM = async (
-  id,
-  data,
-  tx = prisma,
-) => {
+export const findOrderCBMSnapshot = async (id, tx = prisma) => {
+  return tx.order.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      cbm: true,
+      chargeableWeight: true,
+    },
+  });
+};
+
+export const updateOrderCBM = async (id, data, tx = prisma) => {
   return tx.order.update({
     where: {
       id,
@@ -637,22 +575,18 @@ export const updateOrderCBM = async (
     data: {
       cbm: data.cbm,
 
-      chargeableWeight:
-        data.chargeableWeight,
+      chargeableWeight: data.chargeableWeight,
 
-      cbmData:
-        data.cbmData,
+      cbmData: data.cbmData,
 
-      cbmUpdatedAt:
-        data.cbmUpdatedAt ||
-        new Date(),
+      cbmUpdatedAt: data.cbmUpdatedAt || new Date(),
 
-      cbmUpdatedBy:
-        data.cbmUpdatedBy ||
-        null,
+      cbmUpdatedBy: data.cbmUpdatedBy || null,
     },
 
-    include: orderInclude,
+    select: {
+      id: true,
+    },
   });
 };
 
@@ -710,14 +644,7 @@ export const getOrderMetrics = async () => {
     prisma.order.count({
       where: {
         createdAt: {
-          gte: new Date(
-            new Date().setHours(
-              0,
-              0,
-              0,
-              0,
-            ),
-          ),
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
       },
     }),
@@ -727,14 +654,7 @@ export const getOrderMetrics = async () => {
         status: "COMPLETED",
 
         createdAt: {
-          gte: new Date(
-            new Date().setHours(
-              0,
-              0,
-              0,
-              0,
-            ),
-          ),
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
       },
 
@@ -755,15 +675,11 @@ export const getOrderMetrics = async () => {
 
     cancelledOrders,
 
-    totalRevenue:
-      totalRevenue._sum.totalAmount ||
-      0,
+    totalRevenue: totalRevenue._sum.totalAmount || 0,
 
     todayOrders,
 
-    todayRevenue:
-      todayRevenue._sum.totalAmount ||
-      0,
+    todayRevenue: todayRevenue._sum.totalAmount || 0,
   };
 };
 
@@ -771,10 +687,7 @@ export const getOrderMetrics = async () => {
 // ORDER TIMELINE - AUDIT
 // ============================================================
 
-export const findOrderAuditLogs = async (
-  orderId,
-  tx = prisma,
-) => {
+export const findOrderAuditLogs = async (orderId, tx = prisma) => {
   return tx.auditLog.findMany({
     where: {
       entity: "Order",
@@ -792,10 +705,7 @@ export const findOrderAuditLogs = async (
 // ORDER TIMELINE - PAYMENTS
 // ============================================================
 
-export const findOrderPayments = async (
-  orderId,
-  tx = prisma,
-) => {
+export const findOrderPayments = async (orderId, tx = prisma) => {
   return tx.payment.findMany({
     where: {
       orderId,
@@ -811,10 +721,7 @@ export const findOrderPayments = async (
 // ORDER TIMELINE - FULFILLMENTS
 // ============================================================
 
-export const findOrderFulfillments = async (
-  orderId,
-  tx = prisma,
-) => {
+export const findOrderFulfillments = async (orderId, tx = prisma) => {
   return tx.fulfillment.findMany({
     where: {
       orderId,
@@ -834,40 +741,38 @@ export const findOrderFulfillments = async (
 // ORDERS BY FULFILLMENT TYPE
 // ============================================================
 
-export const findOrdersByFulfillmentType =
-  async (
-    fulfillmentType,
-    tx = prisma,
-  ) => {
-    return tx.order.findMany({
-      where: {
-        fulfillmentGroups: {
-          path: "$.types",
-          array_contains: fulfillmentType,
-        },
+export const findOrdersByFulfillmentType = async (
+  fulfillmentType,
+  tx = prisma,
+) => {
+  return tx.order.findMany({
+    where: {
+      fulfillmentGroups: {
+        path: "$.types",
+        array_contains: fulfillmentType,
       },
+    },
 
-      include: {
-        items: {
-          include: {
-            variant: {
-              include: {
-                media: {
-                  select:
-                    variantMediaSelect,
-                },
-
-                product: true,
+    include: {
+      items: {
+        include: {
+          variant: {
+            include: {
+              media: {
+                select: variantMediaSelect,
               },
+
+              product: true,
             },
           },
         },
+      },
 
-        fulfillments: {
-          where: {
-            type: fulfillmentType,
-          },
+      fulfillments: {
+        where: {
+          type: fulfillmentType,
         },
       },
-    });
-  };
+    },
+  });
+};
