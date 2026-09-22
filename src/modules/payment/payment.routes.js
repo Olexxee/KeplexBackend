@@ -1,7 +1,5 @@
 import express from "express";
-
 import * as controller from "./payment.controller.js";
-
 import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import { validateBody } from "../../middlewares/validateMiddleware.js";
 import { initializeOrderPaymentSchema } from "./payment.validation.js";

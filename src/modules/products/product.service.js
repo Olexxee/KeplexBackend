@@ -4,6 +4,7 @@ import {
   buildPaginationMeta,
 } from "../../lib/pagination.js";
 import { productEngine } from "./product.engine.service.js";
+import * as variantService from "../variants/variant.service.js"
 import * as productDb from "./product.db.js";
 import * as productAggregateService from "./product.aggregate.service.js";
 
