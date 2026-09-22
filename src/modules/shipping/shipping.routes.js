@@ -20,6 +20,15 @@ import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
 const shippingRouter = Router();
 
 // ============================================================
+// STOREFRONT (PUBLIC)
+// ============================================================
+
+shippingRouter.get(
+  "/storefront",
+  shippingController.getStorefrontShipping,
+);
+
+// ============================================================
 // SHIPPING QUOTE
 // ============================================================
 

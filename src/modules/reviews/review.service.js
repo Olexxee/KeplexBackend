@@ -3,6 +3,7 @@ import {
   BadRequestError,
   ForbiddenError,
 } from "../../classes/errorClasses.js";
+import { prisma } from "../../config/prisma.js";
 import {
   getPaginationParams,
   buildPaginationMeta,
@@ -10,62 +11,149 @@ import {
 import * as reviewDb from "./review.db.js";
 import * as variantDb from "../variants/variant.db.js";
 import * as orderDb from "../order/order.db.js";
+import { deleteMultipleFromCloudinary } from "../../config/cloudinaryService.js";
+
+const MAX_REVIEW_IMAGES = 3;
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+const getReviewImages = (images = []) =>
+  images.map((image, index) => ({
+    url: image.url,
+    publicId: image.publicId,
+    mimeType: image.mimeType || null,
+    bytes: image.bytes ?? null,
+    format: image.format || null,
+    width: image.width ?? null,
+    height: image.height ?? null,
+    sortOrder: index,
+  }));
+
+const cleanupCloudinaryImages = async (images = []) => {
+  if (!images.length) return;
+
+  try {
+    await deleteMultipleFromCloudinary(images);
+  } catch (error) {
+    console.error("Failed to clean up Cloudinary review images:", error);
+  }
+};
+
+// ============================================================
+// CUSTOMER
+// ============================================================
 
 export const createReview = async (userId, payload) => {
-  const { variantId, orderId, rating, title, comment, images } = payload;
+  const { variantId, orderId, rating, title, comment, images = [] } = payload;
 
-  // Check if variant exists
+  // Images have already been uploaded by middleware at this point.
+  // Therefore, every failure after this point must clean them up.
+  const reviewImages = getReviewImages(images);
+
+  try {
+    if (reviewImages.length > MAX_REVIEW_IMAGES) {
+      throw new BadRequestError(
+        `A review can contain a maximum of ${MAX_REVIEW_IMAGES} images`,
+      );
+    }
+
+    const variant = await variantDb.findVariantById(variantId);
+
+    if (!variant) {
+      throw new NotFoundError("Variant not found");
+    }
+
+    const existingReview = await reviewDb.findReviewByUserAndVariant(
+      userId,
+      variantId,
+    );
+
+    if (existingReview) {
+      throw new BadRequestError(
+        "You have already reviewed this product variant",
+      );
+    }
+
+    let verifiedPurchase = false;
+
+    if (orderId) {
+      const order = await orderDb.findOrderById(orderId);
+
+      if (!order || order.userId !== userId) {
+        throw new BadRequestError("Invalid order");
+      }
+
+      const hasVariant = order.items.some(
+        (item) => item.variantId === variantId,
+      );
+
+      if (!hasVariant) {
+        throw new BadRequestError(
+          "You did not purchase this product variant in this order",
+        );
+      }
+
+      if (!["DELIVERED", "COMPLETED"].includes(order.status)) {
+        throw new BadRequestError(
+          "You can only submit a verified review after the order has been delivered",
+        );
+      }
+
+      verifiedPurchase = true;
+    }
+
+    const review = await prisma.$transaction(async (tx) => {
+      const createdReview = await reviewDb.createReview(
+        {
+          userId,
+          variantId,
+          orderId: orderId || null,
+          rating,
+          title: title || null,
+          comment: comment || null,
+          isVerified: verifiedPurchase,
+          status: "PENDING",
+        },
+        tx,
+      );
+
+      if (reviewImages.length > 0) {
+        await reviewDb.createReviewImages(
+          reviewImages.map((image) => ({
+            reviewId: createdReview.id,
+            ...image,
+          })),
+          tx,
+        );
+      }
+
+      return reviewDb.findReviewById(createdReview.id, tx);
+    });
+
+    return review;
+  } catch (error) {
+    await cleanupCloudinaryImages(reviewImages);
+    throw error;
+  }
+};
+
+export const getReviewsByVariant = async (variantId, filters = {}) => {
+  const { page = 1, limit = 10 } = filters;
+
   const variant = await variantDb.findVariantById(variantId);
+
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
 
-  // Check if user already reviewed this variant
-  const existing = await reviewDb.findReviewsByUser(userId);
-  const alreadyReviewed = existing.reviews.some(
-    (r) => r.variantId === variantId,
-  );
-  if (alreadyReviewed) {
-    throw new BadRequestError("You have already reviewed this product");
-  }
-
-  // If orderId provided, verify user purchased this variant
-  if (orderId) {
-    const order = await orderDb.findOrderById(orderId);
-    if (!order || order.userId !== userId) {
-      throw new BadRequestError("Invalid order");
-    }
-    const hasVariant = order.items.some((item) => item.variantId === variantId);
-    if (!hasVariant) {
-      throw new BadRequestError(
-        "You did not purchase this product in this order",
-      );
-    }
-  }
-
-  const review = await reviewDb.createReview({
-    userId,
-    variantId,
-    orderId: orderId || null,
-    rating,
-    title,
-    comment,
-    images,
-    isVerified: !!orderId,
-    status: "PENDING",
-  });
-
-  return review;
-};
-
-export const getReviewsByVariant = async (variantId, filters) => {
-  const { page = 1, limit = 10, status = "APPROVED" } = filters;
   const { skip, take } = getPaginationParams(page, limit);
 
   const { reviews, total } = await reviewDb.findReviewsByVariant(variantId, {
     skip,
     take,
-    status,
+    status: "APPROVED",
   });
 
   return {
@@ -78,8 +166,9 @@ export const getReviewsByVariant = async (variantId, filters) => {
   };
 };
 
-export const getMyReviews = async (userId, filters) => {
+export const getMyReviews = async (userId, filters = {}) => {
   const { page = 1, limit = 10 } = filters;
+
   const { skip, take } = getPaginationParams(page, limit);
 
   const { reviews, total } = await reviewDb.findReviewsByUser(userId, {
@@ -97,7 +186,7 @@ export const getMyReviews = async (userId, filters) => {
   };
 };
 
-export const getAllReviews = async (filters) => {
+export const getAllReviews = async (filters = {}) => {
   const {
     page = 1,
     limit = 20,
@@ -108,6 +197,7 @@ export const getAllReviews = async (filters) => {
     startDate,
     endDate,
   } = filters;
+
   const { skip, take } = getPaginationParams(page, limit);
 
   const { reviews, total } = await reviewDb.findReviews({
@@ -133,14 +223,17 @@ export const getAllReviews = async (filters) => {
 
 export const getReviewById = async (id) => {
   const review = await reviewDb.findReviewById(id);
+
   if (!review) {
     throw new NotFoundError("Review not found");
   }
+
   return review;
 };
 
 export const updateReview = async (id, userId, payload) => {
   const review = await reviewDb.findReviewById(id);
+
   if (!review) {
     throw new NotFoundError("Review not found");
   }
@@ -149,7 +242,6 @@ export const updateReview = async (id, userId, payload) => {
     throw new ForbiddenError("You can only update your own reviews");
   }
 
-  // Only allow updating before approval
   if (review.status !== "PENDING") {
     throw new BadRequestError("Cannot update review after moderation");
   }
@@ -159,6 +251,7 @@ export const updateReview = async (id, userId, payload) => {
 
 export const deleteReview = async (id, userId) => {
   const review = await reviewDb.findReviewById(id);
+
   if (!review) {
     throw new NotFoundError("Review not found");
   }
@@ -167,33 +260,48 @@ export const deleteReview = async (id, userId) => {
     throw new ForbiddenError("You can only delete your own reviews");
   }
 
-  return reviewDb.deleteReview(id);
+  const images = review.images || [];
+
+  await reviewDb.deleteReview(id);
+
+  await cleanupCloudinaryImages(images);
+
+  return {
+    id,
+    deleted: true,
+  };
 };
 
 export const moderateReview = async (id, payload, adminUserId) => {
   const { status, response } = payload;
+
   const review = await reviewDb.findReviewById(id);
+
   if (!review) {
     throw new NotFoundError("Review not found");
   }
 
-  // Update review status
-  const updated = await reviewDb.updateReview(id, { status });
+  return prisma.$transaction(async (tx) => {
+    await reviewDb.updateReview(id, { status }, tx);
 
-  // Add admin response if provided
-  if (response) {
-    await reviewDb.createReviewResponse({
-      reviewId: id,
-      userId: adminUserId,
-      comment: response,
-    });
-  }
+    if (response) {
+      await reviewDb.createReviewResponse(
+        {
+          reviewId: id,
+          userId: adminUserId,
+          comment: response,
+        },
+        tx,
+      );
+    }
 
-  return updated;
+    return reviewDb.findReviewById(id, tx);
+  });
 };
 
 export const getVariantReviewStats = async (variantId) => {
   const variant = await variantDb.findVariantById(variantId);
+
   if (!variant) {
     throw new NotFoundError("Variant not found");
   }
@@ -203,8 +311,13 @@ export const getVariantReviewStats = async (variantId) => {
 
 export const markHelpful = async (id) => {
   const review = await reviewDb.findReviewById(id);
+
   if (!review) {
     throw new NotFoundError("Review not found");
+  }
+
+  if (review.status !== "APPROVED") {
+    throw new BadRequestError("Only approved reviews can be marked as helpful");
   }
 
   return reviewDb.updateReviewHelpfulness(id, true);
@@ -212,6 +325,7 @@ export const markHelpful = async (id) => {
 
 export const addReviewResponse = async (reviewId, adminUserId, comment) => {
   const review = await reviewDb.findReviewById(reviewId);
+
   if (!review) {
     throw new NotFoundError("Review not found");
   }
@@ -225,8 +339,13 @@ export const addReviewResponse = async (reviewId, adminUserId, comment) => {
 
 export const deleteReviewResponse = async (id, adminUserId) => {
   const response = await reviewDb.findReviewResponseById(id);
+
   if (!response) {
     throw new NotFoundError("Response not found");
+  }
+
+  if (response.userId !== adminUserId) {
+    throw new ForbiddenError("You can only delete your own review responses");
   }
 
   return reviewDb.deleteReviewResponse(id);

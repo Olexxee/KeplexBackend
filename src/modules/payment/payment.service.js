@@ -1,17 +1,48 @@
 import * as paystack from "./paymentGateway/paystack.js";
+import * as pawapay from "./paymentGateway/pawapay.js";
 import * as paymentDb from "./payment.db.js";
-import { NotFoundError, BadRequestError } from "../../classes/errorClasses.js";
+
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../classes/errorClasses.js";
+
 import * as registrationDb from "../registration/registration.db.js";
 import { prisma } from "../../config/prisma.js";
 import { orderQueue } from "../../jobs/queues/order.queue.js";
 
 // ============================================================
+// CONSTANTS
+// ============================================================
+
+const PAYMENT_PROVIDERS = {
+  PAYSTACK: "PAYSTACK",
+  PAWAPAY: "PAWAPAY",
+};
+
+const PAYMENT_FINAL_STATUSES = ["SUCCESS", "FAILED", "REVERSED"];
+const PAWAPAY_CURRENCY = process.env.PAWAPAY_CURRENCY || "NGN";
+const PAWAPAY_PROVIDER = process.env.PAWAPAY_PROVIDER || null;
+
+const isFinalPaymentStatus = (status) =>
+  PAYMENT_FINAL_STATUSES.includes(status);
+
+// ============================================================
 // ORDER PAYMENT
 // ============================================================
 
-export const initializePayment = async ({ order, user }) => {
+export const initializePayment = async ({
+  order,
+  user,
+  provider = PAYMENT_PROVIDERS.PAYSTACK,
+  paymentData = {},
+}) => {
   if (!order) {
     throw new NotFoundError("Order not found");
+  }
+
+  if (!user) {
+    throw new NotFoundError("User not found");
   }
 
   const isOwner = order.userId === user.id;
@@ -25,15 +56,34 @@ export const initializePayment = async ({ order, user }) => {
     throw new BadRequestError("Only pending orders can be paid for");
   }
 
+  const normalizedProvider = String(provider).toUpperCase();
+
+  if (!Object.values(PAYMENT_PROVIDERS).includes(normalizedProvider)) {
+    throw new BadRequestError(`Unsupported payment provider: ${provider}`);
+  }
+
   const existing = order.payments?.find(
-    (payment) => payment.status === "PENDING" && payment.authorizationUrl,
+    (payment) =>
+      payment.provider === normalizedProvider && payment.status === "PENDING",
   );
 
   if (existing) {
     return existing;
   }
 
-  const email = order.user?.email;
+  if (normalizedProvider === PAYMENT_PROVIDERS.PAWAPAY) {
+    return initializePawaPayOrderPayment({ order, paymentData });
+  }
+
+  return initializePaystackOrderPayment({ order });
+};
+
+// ============================================================
+// PAYSTACK ORDER PAYMENT
+// ============================================================
+
+const initializePaystackOrderPayment = async ({ order }) => {
+  const email = order.user?.email || order.customerEmail;
 
   if (!email) {
     throw new BadRequestError("Customer email not found");
@@ -55,8 +105,9 @@ export const initializePayment = async ({ order, user }) => {
   return paymentDb.createPayment({
     orderId: order.id,
     paymentType: "ORDER_PAYMENT",
-    provider: "PAYSTACK",
+    provider: PAYMENT_PROVIDERS.PAYSTACK,
     reference,
+    providerReference: null,
     amount: order.totalAmount,
     currency: "NGN",
     status: "PENDING",
@@ -67,12 +118,76 @@ export const initializePayment = async ({ order, user }) => {
 };
 
 // ============================================================
+// PAWAPAY ORDER PAYMENT
+// ============================================================
+
+const initializePawaPayOrderPayment = async ({ order, paymentData }) => {
+  const phoneNumber =
+    paymentData.phoneNumber || order.customerPhone || order.user?.phone;
+
+  const provider = paymentData.provider || PAWAPAY_PROVIDER;
+
+  if (!phoneNumber) {
+    throw new BadRequestError("Mobile money phone number is required");
+  }
+
+  if (!provider) {
+    throw new BadRequestError("Mobile money provider is required");
+  }
+
+  const depositId = pawapay.generateDepositId();
+  const reference = paystack.generateReference("KPX-ORDER");
+  const customerMessage =
+    paymentData.customerMessage || `Order ${order.orderNumber}`;
+
+  if (customerMessage.length < 4 || customerMessage.length > 22) {
+    throw new BadRequestError(
+      "pawaPay customer message must be between 4 and 22 characters",
+    );
+  }
+
+  const init = await pawapay.initializeDeposit({
+    depositId,
+    amount: order.totalAmount,
+    currency: PAWAPAY_CURRENCY,
+    phoneNumber,
+    provider,
+    clientReferenceId: reference,
+    customerMessage,
+    metadata: [
+      { orderId: order.id },
+      ...(order.userId ? [{ customerId: order.userId }] : []),
+    ],
+  });
+
+  if (!["ACCEPTED", "DUPLICATE_IGNORED"].includes(init.status)) {
+    throw new BadRequestError(
+      init.rejectionReason?.rejectionMessage ||
+        `pawaPay rejected the payment request with status ${init.status}`,
+    );
+  }
+
+  return paymentDb.createPayment({
+    orderId: order.id,
+    paymentType: "ORDER_PAYMENT",
+    provider: PAYMENT_PROVIDERS.PAWAPAY,
+    reference,
+    providerReference: depositId,
+    amount: order.totalAmount,
+    currency: PAWAPAY_CURRENCY,
+    status: "PENDING",
+    authorizationUrl: null,
+    accessCode: null,
+    providerPayload: init.raw,
+  });
+};
+
+// ============================================================
 // REGISTRATION PAYMENT
 // ============================================================
 
 export const initializeRegistrationPayment = async ({ registrationId }) => {
-  const registration =
-    await registrationDb.findRegistrationById(registrationId);
+  const registration = await registrationDb.findRegistrationById(registrationId);
 
   if (!registration) {
     throw new NotFoundError("Registration not found");
@@ -105,8 +220,9 @@ export const initializeRegistrationPayment = async ({ registrationId }) => {
   await paymentDb.createPayment({
     trainingEnrollmentId: registration.id,
     paymentType: "TRAINING_REGISTRATION",
-    provider: "PAYSTACK",
+    provider: PAYMENT_PROVIDERS.PAYSTACK,
     reference,
+    providerReference: null,
     amount,
     currency: "NGN",
     status: "PENDING",
@@ -139,43 +255,47 @@ export const verifyPayment = async (reference) => {
     throw new NotFoundError("Payment not found");
   }
 
-  if (["SUCCESS", "FAILED", "REVERSED"].includes(payment.status)) {
+  if (isFinalPaymentStatus(payment.status)) {
     return payment;
   }
 
-  const verification = await paystack.verifyTransaction(reference);
+  if (payment.provider === PAYMENT_PROVIDERS.PAWAPAY) {
+    return verifyPawaPayPayment(payment);
+  }
 
+  return verifyPaystackPayment(reference);
+};
+
+// ============================================================
+// PAYSTACK VERIFICATION
+// ============================================================
+
+const verifyPaystackPayment = async (reference) => {
+  const verification = await paystack.verifyTransaction(reference);
   const status = verification.status;
 
   const result = await prisma.$transaction(async (tx) => {
-    const currentPayment = await tx.payment.findUnique({
-      where: { reference },
-      include: {
-        order: true,
-      },
-    });
+    const currentPayment = await paymentDb.findPaymentByReference(reference, tx);
 
     if (!currentPayment) {
       throw new NotFoundError("Payment not found");
     }
 
-    if (["SUCCESS", "FAILED", "REVERSED"].includes(currentPayment.status)) {
+    if (isFinalPaymentStatus(currentPayment.status)) {
       return {
         payment: currentPayment,
         orderConfirmed: false,
       };
     }
 
-    const updatedPayment = await tx.payment.update({
-      where: { reference },
-      data: {
+    const updatedPayment = await paymentDb.updatePaymentByReference(
+      reference,
+      {
         status,
         providerPayload: verification.raw,
       },
-      include: {
-        order: true,
-      },
-    });
+      tx,
+    );
 
     if (status !== "SUCCESS") {
       return {
@@ -184,52 +304,196 @@ export const verifyPayment = async (reference) => {
       };
     }
 
-    if (
-      currentPayment.paymentType === "ORDER_PAYMENT" &&
-      updatedPayment.order?.status === "PENDING"
-    ) {
-      await tx.order.update({
-        where: {
-          id: updatedPayment.orderId,
-        },
-        data: {
-          status: "CONFIRMED",
-        },
-      });
-
-      return {
-        payment: updatedPayment,
-        orderConfirmed: true,
-      };
-    }
-
-    if (currentPayment.paymentType === "TRAINING_REGISTRATION") {
-      if (currentPayment.trainingEnrollmentId) {
-        await tx.trainingEnrollment.update({
-          where: {
-            id: currentPayment.trainingEnrollmentId,
-          },
-          data: {
-            status: "PAID",
-            paidAt: new Date(),
-          },
-        });
-      }
-    }
+    const orderConfirmed = await confirmOrderPayment(updatedPayment, tx);
 
     return {
-      payment: updatedPayment,
-      orderConfirmed: false,
+      payment: orderConfirmed.payment,
+      orderConfirmed: orderConfirmed.orderConfirmed,
     };
   });
 
   if (result.orderConfirmed) {
-    await queueOrderPaymentConfirmed({
-      payment: result.payment,
-    });
+    await queueOrderPaymentConfirmed({ payment: result.payment });
   }
 
   return result.payment;
+};
+
+// ============================================================
+// PAWAPAY VERIFICATION
+// ============================================================
+
+const verifyPawaPayPayment = async (payment) => {
+  if (!payment.providerReference) {
+    throw new BadRequestError("pawaPay deposit reference is missing");
+  }
+
+  const verification = await pawapay.getDepositStatus(payment.providerReference);
+
+  if (verification.status !== "FOUND") {
+    throw new BadRequestError("pawaPay deposit could not be found");
+  }
+
+  const deposit = verification.data;
+
+  if (!deposit) {
+    throw new BadRequestError("pawaPay deposit details are missing");
+  }
+
+  const result = await applyPawaPayStatus(payment.providerReference, deposit);
+
+  if (result.orderConfirmed) {
+    await queueOrderPaymentConfirmed({ payment: result.payment });
+  }
+
+  return result.payment;
+};
+
+// ============================================================
+// PAWAPAY CALLBACK
+// ============================================================
+
+export const handlePawaPayCallback = async (payload) => {
+  const depositId = payload?.depositId;
+
+  if (!depositId) {
+    throw new BadRequestError("pawaPay callback depositId is required");
+  }
+
+  const verification = await pawapay.getDepositStatus(depositId);
+
+  if (verification.status !== "FOUND") {
+    throw new BadRequestError("pawaPay deposit could not be verified");
+  }
+
+  const deposit = verification.data;
+
+  if (!deposit) {
+    throw new BadRequestError("pawaPay deposit details are missing");
+  }
+
+  const payment = await paymentDb.findPaymentByProviderReference(depositId);
+
+  if (!payment) {
+    console.warn(`[PAWAPAY CALLBACK] Unknown deposit: ${depositId}`);
+    return null;
+  }
+
+  if (
+    deposit.clientReferenceId &&
+    deposit.clientReferenceId !== payment.reference
+  ) {
+    throw new BadRequestError("pawaPay payment reference mismatch");
+  }
+
+  const result = await applyPawaPayStatus(depositId, deposit);
+
+  if (result.orderConfirmed) {
+    await queueOrderPaymentConfirmed({ payment: result.payment });
+  }
+
+  return result.payment;
+};
+
+// ============================================================
+// APPLY PAWAPAY STATUS
+// ============================================================
+
+const applyPawaPayStatus = async (depositId, deposit) => {
+  const normalizedStatus = normalizePawaPayStatus(deposit.status);
+
+  return prisma.$transaction(async (tx) => {
+    const currentPayment = await paymentDb.findPaymentByProviderReference(
+      depositId,
+      tx,
+    );
+
+    if (!currentPayment) {
+      throw new NotFoundError("Payment not found");
+    }
+
+    if (isFinalPaymentStatus(currentPayment.status)) {
+      return {
+        payment: currentPayment,
+        orderConfirmed: false,
+      };
+    }
+
+    const updatedPayment = await paymentDb.updatePaymentByProviderReference(
+      depositId,
+      {
+        status: normalizedStatus,
+        providerPayload: deposit,
+      },
+      tx,
+    );
+
+    if (normalizedStatus !== "SUCCESS") {
+      return {
+        payment: updatedPayment,
+        orderConfirmed: false,
+      };
+    }
+
+    const orderConfirmed = await confirmOrderPayment(updatedPayment, tx);
+
+    return {
+      payment: orderConfirmed.payment,
+      orderConfirmed: orderConfirmed.orderConfirmed,
+    };
+  });
+};
+
+// ============================================================
+// STATUS NORMALIZATION
+// ============================================================
+
+const normalizePawaPayStatus = (status) => {
+  switch (String(status).toUpperCase()) {
+    case "COMPLETED":
+      return "SUCCESS";
+    case "FAILED":
+      return "FAILED";
+    default:
+      return "PENDING";
+  }
+};
+
+// ============================================================
+// ORDER CONFIRMATION
+// ============================================================
+
+const confirmOrderPayment = async (payment, tx) => {
+  if (payment.paymentType !== "ORDER_PAYMENT") {
+    return {
+      payment,
+      orderConfirmed: false,
+    };
+  }
+
+  if (!payment.orderId || payment.order?.status !== "PENDING") {
+    return {
+      payment,
+      orderConfirmed: false,
+    };
+  }
+
+  const order = await tx.order.update({
+    where: {
+      id: payment.orderId,
+    },
+    data: {
+      status: "CONFIRMED",
+    },
+  });
+
+  return {
+    payment: {
+      ...payment,
+      order,
+    },
+    orderConfirmed: true,
+  };
 };
 
 // ============================================================
@@ -241,12 +505,6 @@ export const handleWebhook = async (event) => {
     return;
   }
 
-  /*
-   * We only process charge.success here.
-   *
-   * Other Paystack events can be added later without
-   * changing the webhook controller.
-   */
   if (event.event !== "charge.success") {
     return;
   }
@@ -261,17 +519,9 @@ export const handleWebhook = async (event) => {
 
   if (!payment) {
     console.warn(`[PAYSTACK WEBHOOK] Unknown payment reference: ${reference}`);
-
     return;
   }
 
-  /*
-   * Fast idempotency check.
-   *
-   * The transaction below performs the authoritative
-   * database check again because two identical webhooks
-   * can theoretically arrive at the same time.
-   */
   if (payment.status === "SUCCESS") {
     return;
   }
@@ -279,14 +529,7 @@ export const handleWebhook = async (event) => {
   const status = paystack.mapStatus(event.data?.status);
 
   const result = await prisma.$transaction(async (tx) => {
-    const currentPayment = await tx.payment.findUnique({
-      where: {
-        reference,
-      },
-      include: {
-        order: true,
-      },
-    });
+    const currentPayment = await paymentDb.findPaymentByReference(reference, tx);
 
     if (!currentPayment) {
       return {
@@ -295,9 +538,6 @@ export const handleWebhook = async (event) => {
       };
     }
 
-    /*
-     * Authoritative idempotency check.
-     */
     if (currentPayment.status === "SUCCESS") {
       return {
         payment: currentPayment,
@@ -305,18 +545,14 @@ export const handleWebhook = async (event) => {
       };
     }
 
-    const updatedPayment = await tx.payment.update({
-      where: {
-        reference,
-      },
-      data: {
+    const updatedPayment = await paymentDb.updatePaymentByReference(
+      reference,
+      {
         status,
         providerPayload: event,
       },
-      include: {
-        order: true,
-      },
-    });
+      tx,
+    );
 
     if (status !== "SUCCESS") {
       return {
@@ -325,31 +561,8 @@ export const handleWebhook = async (event) => {
       };
     }
 
-    /*
-     * ORDER PAYMENT
-     */
-    if (
-      currentPayment.paymentType === "ORDER_PAYMENT" &&
-      updatedPayment.order?.status === "PENDING"
-    ) {
-      await tx.order.update({
-        where: {
-          id: updatedPayment.orderId,
-        },
-        data: {
-          status: "CONFIRMED",
-        },
-      });
+    const orderConfirmed = await confirmOrderPayment(updatedPayment, tx);
 
-      return {
-        payment: updatedPayment,
-        orderConfirmed: true,
-      };
-    }
-
-    /*
-     * TRAINING REGISTRATION
-     */
     if (currentPayment.paymentType === "TRAINING_REGISTRATION") {
       if (currentPayment.trainingEnrollmentId) {
         await tx.trainingEnrollment.update({
@@ -362,27 +575,21 @@ export const handleWebhook = async (event) => {
           },
         });
       }
+
+      return {
+        payment: updatedPayment,
+        orderConfirmed: false,
+      };
     }
 
     return {
-      payment: updatedPayment,
-      orderConfirmed: false,
+      payment: orderConfirmed.payment,
+      orderConfirmed: orderConfirmed.orderConfirmed,
     };
   });
 
-  /*
-   * IMPORTANT:
-   *
-   * This happens AFTER the payment/order transaction
-   * has committed.
-   *
-   * Fulfillment is therefore never created inside
-   * the Paystack database transaction.
-   */
   if (result.orderConfirmed) {
-    await queueOrderPaymentConfirmed({
-      payment: result.payment,
-    });
+    await queueOrderPaymentConfirmed({ payment: result.payment });
   }
 
   return result.payment;
@@ -408,9 +615,7 @@ const queueOrderPaymentConfirmed = async ({ payment }) => {
         reference: payment.reference,
         userId: payment.order?.userId ?? null,
       },
-      {
-        jobId,
-      },
+      { jobId },
     );
 
     console.log("[PAYMENT] Order payment confirmation queued:", {
@@ -421,19 +626,11 @@ const queueOrderPaymentConfirmed = async ({ payment }) => {
 
     return job;
   } catch (error) {
-    /*
-     * Payment and order confirmation have already committed.
-     *
-     * Do not convert a successful payment into a failed
-     * webhook response simply because Redis is temporarily
-     * unavailable.
-     */
     console.error("[PAYMENT] Failed to queue order payment confirmation:", {
       orderId: payment.orderId,
       reference: payment.reference,
       error,
     });
-
     return null;
   }
 };

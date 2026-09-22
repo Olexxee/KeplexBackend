@@ -224,3 +224,17 @@ export const updateOrderWithCBM = async (
     data: result,
   });
 };
+
+
+// ============================================================
+// STOREFRONT
+// ============================================================
+
+export const getStorefrontShipping = async (req, res) => {
+  const config = await shippingService.getStorefrontShipping();
+
+  res.json({
+    success: true,
+    data: config,
+  });
+};

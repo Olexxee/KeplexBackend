@@ -1030,3 +1030,52 @@ export const updateOrderWithCBM = async ({
     },
   );
 };
+
+// ============================================================
+// STOREFRONT
+// ============================================================
+//
+// Public read used by the customer-facing shipping page. Returns the
+// active configuration with only its active rules. Returns `null`
+// rather than throwing when nothing is configured — the storefront
+// renders a friendly empty state instead of a 404.
+
+export const getStorefrontShipping = async () => {
+  const config = await shippingDb.getActiveShippingConfig();
+
+  if (!config) {
+    return null;
+  }
+
+  return {
+    id: config.id,
+    name: config.name,
+    status: config.status,
+
+    pricePerKg: config.pricePerKg,
+    pricePerCBM: config.pricePerCBM,
+    handlingFee: config.handlingFee,
+    minCharge: config.minCharge,
+    freeShippingThreshold: config.freeShippingThreshold,
+
+    rules: (config.rules ?? [])
+      .filter((rule) => rule.isActive)
+      .map((rule) => ({
+        id: rule.id,
+        name: rule.name,
+        type: rule.type,
+        isActive: rule.isActive,
+
+        minSubtotal: rule.minSubtotal,
+        maxSubtotal: rule.maxSubtotal,
+        minWeight: rule.minWeight,
+        maxWeight: rule.maxWeight,
+
+        baseRate: rule.baseRate,
+        ratePerKg: rule.ratePerKg,
+        ratePerCBM: rule.ratePerCBM,
+
+        priority: rule.priority,
+      })),
+  };
+};

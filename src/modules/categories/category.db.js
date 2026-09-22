@@ -1,4 +1,9 @@
+// src/modules/categories/category.db.js
 import { prisma } from "../../config/prisma.js";
+
+// ============================================================================
+// SHARED SELECTS
+// ============================================================================
 
 const categoryMediaSelect = {
   id: true,
@@ -18,11 +23,7 @@ const categoryMediaSelect = {
 
 const categoryRelations = {
   parent: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-    },
+    select: { id: true, name: true, slug: true },
   },
 
   children: {
@@ -43,32 +44,25 @@ const categoryRelations = {
   },
 
   _count: {
-    select: {
-      children: true,
-      products: true,
-    },
+    select: { children: true, products: true },
   },
 };
 
-export const createCategory = async (data) => {
-  return prisma.category.create({
-    data,
-    include: categoryRelations,
-  });
-};
+// ============================================================================
+// CRUD
+// ============================================================================
 
-export const findCategoryById = async (id) => {
-  return prisma.category.findUnique({
-    where: { id },
-  });
-};
+export const createCategory = (data) =>
+  prisma.category.create({ data, include: categoryRelations });
 
-export const findCategoryBySlug = async (slug) => {
-  return prisma.category.findUnique({
-    where: { slug },
-    include: categoryRelations,
-  });
-};
+export const findCategoryById = (id) =>
+  prisma.category.findUnique({ where: { id } });
+
+export const findCategoryByIdWithRelations = (id) =>
+  prisma.category.findUnique({ where: { id }, include: categoryRelations });
+
+export const findCategoryBySlug = (slug) =>
+  prisma.category.findUnique({ where: { slug }, include: categoryRelations });
 
 export const findCategories = async ({
   type,
@@ -81,92 +75,61 @@ export const findCategories = async ({
   const where = {
     ...(type && { type }),
 
-    ...(typeof isActive === "boolean" && {
-      isActive,
-    }),
+    ...(typeof isActive === "boolean" && { isActive }),
 
-    ...(parentId !== undefined && {
-      parentId: parentId || null,
-    }),
+    ...(parentId !== undefined && { parentId: parentId || null }),
 
     ...(search && {
       OR: [
-        {
-          name: {
-            contains: search,
-            mode: "insensitive",
-          },
-        },
-        {
-          slug: {
-            contains: search,
-            mode: "insensitive",
-          },
-        },
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
       ],
     }),
   };
 
-  const queryOptions = {
-    where,
-
-    include: categoryRelations,
-
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-
-    skip,
-    take,
-  };
-
   const [categories, total] = await Promise.all([
-    prisma.category.findMany(queryOptions),
+    prisma.category.findMany({
+      where,
+      include: categoryRelations,
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      skip,
+      take,
+    }),
+
     prisma.category.count({ where }),
   ]);
 
-  return {
-    categories,
-    total,
-  };
+  return { categories, total };
 };
 
-export const updateCategory = async (id, data) => {
-  return prisma.category.update({
-    where: { id },
-    data,
-    include: categoryRelations,
-  });
-};
+export const updateCategory = (id, data) =>
+  prisma.category.update({ where: { id }, data, include: categoryRelations });
 
-export const deleteCategory = async (id) => {
-  return prisma.category.delete({
-    where: { id },
-  });
-};
+export const deleteCategory = (id) => prisma.category.delete({ where: { id } });
 
-export const createCategoryMedia = async (categoryId, data) => {
-  return prisma.categoryMedia.create({
-    data: {
-      categoryId,
-      ...data,
-    },
-  });
-};
+// ============================================================================
+// MEDIA
+// ============================================================================
 
-export const findCategoryByIdWithRelations = async (id) => {
-  return prisma.category.findUnique({
-    where: { id },
-    include: categoryRelations,
+export const createCategoryMedia = (categoryId, data) =>
+  prisma.categoryMedia.create({
+    data: { categoryId, ...data },
   });
-};
 
-export const clearPrimaryCategoryMedia = async (categoryId) => {
-  return prisma.categoryMedia.updateMany({
-    where: {
-      categoryId,
-      isPrimary: true,
-    },
-    data: {
-      isPrimary: false,
-    },
+export const clearPrimaryCategoryMedia = (categoryId) =>
+  prisma.categoryMedia.updateMany({
+    where: { categoryId, isPrimary: true },
+    data: { isPrimary: false },
   });
-};
+
+// ============================================================================
+// RELATION COUNTS
+// ============================================================================
+//
+// Used by the service layer to guard against deleting categories that are
+// still referenced. `Product.categoryId` is a required relation without
+// onDelete cascade, so deleting a category with products would otherwise
+// raise Prisma P2003 (foreign key constraint failed).
+
+export const countProductsInCategory = (categoryId) =>
+  prisma.product.count({ where: { categoryId } });

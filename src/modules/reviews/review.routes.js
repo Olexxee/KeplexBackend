@@ -1,29 +1,37 @@
 import { Router } from "express";
-import { authMiddleware } from "../../middlewares/authMiddleware.js";
-import { roleMiddleware } from "../../middlewares/roleMiddleware.js";
-import {
-  validateBody,
-  validateParams,
-  validateQuery,
-} from "../../middlewares/validateMiddleware.js";
 import * as reviewController from "./review.controller.js";
 import {
   createReviewSchema,
+  createReviewFieldsSchema,
   updateReviewSchema,
-  reviewIdSchema,
-  variantIdSchema,
   moderateReviewSchema,
   addReviewResponseSchema,
-  getReviewsQuerySchema,
+  reviewIdSchema,
+  variantIdSchema,
+  getPublicReviewsQuerySchema,
+  getMyReviewsQuerySchema,
+  getAdminReviewsQuerySchema,
 } from "./review.validation.js";
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+} from "../../middlewares/validateMiddleware.js";
+import { authMiddleware } from "../../middlewares/authMiddleware.js";
+import { roleMiddleware  } from "../../middlewares/roleMiddleware.js";
+import { processImages } from "../../middlewares/processItemImages.js";
+import { uploadReviewImages } from "../../middlewares/uploadMiddleware.js";
 
 const reviewRouter = Router();
 
-// ============ Public Routes ============
+// ============================================================
+// PUBLIC
+// ============================================================
+
 reviewRouter.get(
   "/variant/:variantId",
   validateParams(variantIdSchema),
-  validateQuery(getReviewsQuerySchema),
+  validateQuery(getPublicReviewsQuerySchema),
   reviewController.getVariantReviews,
 );
 
@@ -33,18 +41,32 @@ reviewRouter.get(
   reviewController.getVariantReviewStats,
 );
 
-// ============ Customer Routes (Auth Required) ============
+// ============================================================
+// AUTHENTICATED
+// ============================================================
+
 reviewRouter.use(authMiddleware);
+
+// ============================================================
+// CUSTOMER — CREATE
+// ============================================================
 
 reviewRouter.post(
   "/",
+  uploadReviewImages,
+  validateBody(createReviewFieldsSchema),
+  processImages("images", "keplex/reviews"),
   validateBody(createReviewSchema),
   reviewController.createReview,
 );
 
+// ============================================================
+// CUSTOMER — READ
+// ============================================================
+
 reviewRouter.get(
   "/me",
-  validateQuery(getReviewsQuerySchema),
+  validateQuery(getMyReviewsQuerySchema),
   reviewController.getMyReviews,
 );
 
@@ -53,6 +75,10 @@ reviewRouter.get(
   validateParams(reviewIdSchema),
   reviewController.getReviewById,
 );
+
+// ============================================================
+// CUSTOMER — UPDATE / DELETE
+// ============================================================
 
 reviewRouter.patch(
   "/:id",
@@ -73,17 +99,20 @@ reviewRouter.patch(
   reviewController.markHelpful,
 );
 
-// ============ Admin Routes ============
+// ============================================================
+// ADMIN
+// ============================================================
+
 reviewRouter.get(
   "/admin/all",
-  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
-  validateQuery(getReviewsQuerySchema),
+  roleMiddleware("ADMIN", "SUPER_ADMIN", "STAFF"),
+  validateQuery(getAdminReviewsQuerySchema),
   reviewController.getAllReviews,
 );
 
 reviewRouter.patch(
   "/admin/:id/moderate",
-  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  roleMiddleware ("ADMIN", "SUPER_ADMIN", "STAFF"),
   validateParams(reviewIdSchema),
   validateBody(moderateReviewSchema),
   reviewController.moderateReview,
@@ -91,7 +120,7 @@ reviewRouter.patch(
 
 reviewRouter.post(
   "/admin/:id/response",
-  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  roleMiddleware ("ADMIN", "SUPER_ADMIN", "STAFF"),
   validateParams(reviewIdSchema),
   validateBody(addReviewResponseSchema),
   reviewController.addReviewResponse,
@@ -99,7 +128,7 @@ reviewRouter.post(
 
 reviewRouter.delete(
   "/admin/response/:responseId",
-  roleMiddleware("SUPER_ADMIN", "ADMIN", "STAFF"),
+  roleMiddleware ("ADMIN", "SUPER_ADMIN", "STAFF"),
   reviewController.deleteReviewResponse,
 );
 

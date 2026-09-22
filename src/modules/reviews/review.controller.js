@@ -1,21 +1,17 @@
 import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
+
 import * as reviewService from "./review.service.js";
 
-// ============ Customer Endpoints ============
+// ============================================================
+// CUSTOMER ENDPOINTS
+// ============================================================
 
 export const createReview = asyncWrapper(async (req, res) => {
-  // If images were uploaded via middleware, they'll be in req.body.images
-  // or req.body.variantImages depending on which middleware was used
   const reviewData = {
     ...req.body,
-    // If using processImages middleware, images are already processed
-    // If using processSingleImage, it's in req.uploadedImage
-    // Adjust based on your route configuration
   };
-
   const review = await reviewService.createReview(req.user.id, reviewData);
-
   return successResponse({
     res,
     statusCode: 201,
@@ -26,7 +22,6 @@ export const createReview = asyncWrapper(async (req, res) => {
 
 export const getMyReviews = asyncWrapper(async (req, res) => {
   const result = await reviewService.getMyReviews(req.user.id, req.query);
-
   return successResponse({
     res,
     message: "My reviews fetched successfully",
@@ -37,7 +32,6 @@ export const getMyReviews = asyncWrapper(async (req, res) => {
 
 export const getReviewById = asyncWrapper(async (req, res) => {
   const review = await reviewService.getReviewById(req.params.id);
-
   return successResponse({
     res,
     message: "Review fetched successfully",
@@ -46,9 +40,9 @@ export const getReviewById = asyncWrapper(async (req, res) => {
 });
 
 export const updateReview = asyncWrapper(async (req, res) => {
-  // If images are being updated, they'll be in req.body
-  const updateData = req.body;
-
+  const updateData = {
+    ...req.body,
+  };
   const review = await reviewService.updateReview(
     req.params.id,
     req.user.id,
@@ -82,7 +76,9 @@ export const markHelpful = asyncWrapper(async (req, res) => {
   });
 });
 
-// ============ Public Endpoints ============
+// ============================================================
+// PUBLIC ENDPOINTS
+// ============================================================
 
 export const getVariantReviews = asyncWrapper(async (req, res) => {
   const result = await reviewService.getReviewsByVariant(
@@ -108,7 +104,9 @@ export const getVariantReviewStats = asyncWrapper(async (req, res) => {
   });
 });
 
-// ============ Admin Endpoints ============
+// ============================================================
+// ADMIN ENDPOINTS
+// ============================================================
 
 export const getAllReviews = asyncWrapper(async (req, res) => {
   const result = await reviewService.getAllReviews(req.query);
