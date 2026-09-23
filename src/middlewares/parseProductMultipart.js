@@ -90,3 +90,58 @@ export const parseCategoryMultipart = (req, res, next) => {
     next(new BadRequestError("Invalid category data in request"));
   }
 };
+// ============================================================================
+// VARIANT MULTIPART
+// ============================================================================
+
+const VARIANT_NULLABLE_NUMERIC = [
+  "compareAtPrice",
+  "length",
+  "width",
+  "height",
+];
+
+const coerceNullableNumber = (value) => {
+  if (value === "") return null;
+  if (typeof value !== "string") return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
+export const parseVariantMultipart = (req, res, next) => {
+  try {
+    if (!req.body || typeof req.body !== "object") return next();
+
+    if (typeof req.body.isActive === "string") {
+      req.body.isActive = coerceBoolean(req.body.isActive);
+    }
+
+    for (const key of VARIANT_NULLABLE_NUMERIC) {
+      if (typeof req.body[key] === "string") {
+        req.body[key] = coerceNullableNumber(req.body[key]);
+      }
+    }
+
+    for (const key of ["attributes", "metadata"]) {
+      if (typeof req.body[key] === "string" && req.body[key] !== "") {
+        try {
+          req.body[key] = JSON.parse(req.body[key]);
+        } catch {
+          // leave as string; Joi will reject with "must be of type object"
+        }
+      }
+    }
+
+    if (typeof req.body.imageIndexes === "string" && req.body.imageIndexes !== "") {
+      try {
+        req.body.imageIndexes = JSON.parse(req.body.imageIndexes);
+      } catch {
+        // leave as string; Joi will reject
+      }
+    }
+
+    next();
+  } catch {
+    return next(new BadRequestError("Invalid variant data in request"));
+  }
+};
