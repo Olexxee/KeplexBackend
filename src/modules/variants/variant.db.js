@@ -145,29 +145,34 @@ export const updateVariant = (id, data, tx = null) =>
   });
 
 export const updateVariantMedia = async (id, mediaData = [], tx = null) => {
-  const client = db(tx);
+  // Delete + recreate must be atomic: if the create fails after the delete,
+  // the variant would otherwise be left with no images. Reuse the caller's
+  // transaction when there is one, otherwise open our own.
+  const replaceMedia = async (client) => {
+    await client.variantMedia.deleteMany({ where: { variantId: id } });
 
-  await client.variantMedia.deleteMany({ where: { variantId: id } });
-
-  return client.productVariant.update({
-    where: { id },
-    data: {
-      media: {
-        create: mediaData.map((image, index) => ({
-          url: image.url,
-          publicId: image.publicId,
-          mimeType: image.mimeType,
-          bytes: image.bytes,
-          format: image.format,
-          width: image.width,
-          height: image.height,
-          isPrimary: index === 0,
-          sortOrder: index,
-        })),
+    return client.productVariant.update({
+      where: { id },
+      data: {
+        media: {
+          create: mediaData.map((image, index) => ({
+            url: image.url,
+            publicId: image.publicId,
+            mimeType: image.mimeType,
+            bytes: image.bytes,
+            format: image.format,
+            width: image.width,
+            height: image.height,
+            isPrimary: index === 0,
+            sortOrder: index,
+          })),
+        },
       },
-    },
-    include: variantWriteInclude,
-  });
+      include: variantWriteInclude,
+    });
+  };
+
+  return tx ? replaceMedia(tx) : prisma.$transaction(replaceMedia);
 };
 
 export const deleteVariant = (id, tx = null) =>

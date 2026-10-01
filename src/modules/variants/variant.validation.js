@@ -51,6 +51,26 @@ export const updateVariantAdminSchema = variantFieldsSchema
   .keys({
     productId: Joi.any().forbidden(), // cannot reparent
     variantImages: Joi.array().items(mediaItemSchema).optional(),
+
+    // The base schema carries CREATE-time defaults (stock 0, isActive true,
+    // LOCAL fulfillment/shipping). On a PATCH those would be injected into
+    // every request that omits the field and silently reset the variant.
+    // Redefine them without defaults so omitted means "unchanged".
+    stock: Joi.number().integer().min(0),
+    isActive: Joi.boolean(),
+    fulfillmentType: Joi.string().valid(
+      "LOCAL",
+      "IMPORT",
+      "PREORDER",
+      "DIGITAL",
+    ),
+    shippingType: Joi.string().valid(
+      "LOCAL",
+      "IMPORT",
+      "SEA",
+      "AIR",
+      "DIGITAL",
+    ),
   })
   .min(1);
 

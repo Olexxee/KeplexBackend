@@ -1,13 +1,8 @@
 import * as paystack from "./paymentGateway/paystack.js";
 import * as pawapay from "./paymentGateway/pawapay.js";
 import * as paymentDb from "./payment.db.js";
+import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
 
-import {
-  BadRequestError,
-  NotFoundError,
-} from "../../classes/errorClasses.js";
-
-import * as registrationDb from "../registration/registration.db.js";
 import { prisma } from "../../config/prisma.js";
 import { orderQueue } from "../../jobs/queues/order.queue.js";
 
@@ -183,68 +178,6 @@ const initializePawaPayOrderPayment = async ({ order, paymentData }) => {
 };
 
 // ============================================================
-// REGISTRATION PAYMENT
-// ============================================================
-
-export const initializeRegistrationPayment = async ({ registrationId }) => {
-  const registration = await registrationDb.findRegistrationById(registrationId);
-
-  if (!registration) {
-    throw new NotFoundError("Registration not found");
-  }
-
-  if (registration.status === "PAID") {
-    throw new BadRequestError("Registration already paid");
-  }
-
-  const amount = registration.trainingProgram.price;
-  const email = registration.email;
-
-  if (!email) {
-    throw new BadRequestError("Registration customer email not found");
-  }
-
-  const reference = paystack.generateReference("KPX-REG");
-
-  const init = await paystack.initializeTransaction({
-    email,
-    amount,
-    reference,
-    metadata: {
-      type: "TRAINING_REGISTRATION",
-      registrationId: registration.id,
-      trainingProgramId: registration.trainingProgramId,
-    },
-  });
-
-  await paymentDb.createPayment({
-    trainingEnrollmentId: registration.id,
-    paymentType: "TRAINING_REGISTRATION",
-    provider: PAYMENT_PROVIDERS.PAYSTACK,
-    reference,
-    providerReference: null,
-    amount,
-    currency: "NGN",
-    status: "PENDING",
-    authorizationUrl: init.authorization_url,
-    accessCode: init.access_code,
-    providerPayload: init.raw,
-  });
-
-  await registrationDb.updateRegistrationById(registration.id, {
-    paymentRef: reference,
-    authorizationUrl: init.authorization_url,
-    accessCode: init.access_code,
-  });
-
-  return {
-    reference,
-    authorizationUrl: init.authorization_url,
-    accessCode: init.access_code,
-  };
-};
-
-// ============================================================
 // VERIFY PAYMENT
 // ============================================================
 
@@ -275,7 +208,10 @@ const verifyPaystackPayment = async (reference) => {
   const status = verification.status;
 
   const result = await prisma.$transaction(async (tx) => {
-    const currentPayment = await paymentDb.findPaymentByReference(reference, tx);
+    const currentPayment = await paymentDb.findPaymentByReference(
+      reference,
+      tx,
+    );
 
     if (!currentPayment) {
       throw new NotFoundError("Payment not found");
@@ -328,7 +264,9 @@ const verifyPawaPayPayment = async (payment) => {
     throw new BadRequestError("pawaPay deposit reference is missing");
   }
 
-  const verification = await pawapay.getDepositStatus(payment.providerReference);
+  const verification = await pawapay.getDepositStatus(
+    payment.providerReference,
+  );
 
   if (verification.status !== "FOUND") {
     throw new BadRequestError("pawaPay deposit could not be found");
@@ -529,7 +467,10 @@ export const handleWebhook = async (event) => {
   const status = paystack.mapStatus(event.data?.status);
 
   const result = await prisma.$transaction(async (tx) => {
-    const currentPayment = await paymentDb.findPaymentByReference(reference, tx);
+    const currentPayment = await paymentDb.findPaymentByReference(
+      reference,
+      tx,
+    );
 
     if (!currentPayment) {
       return {
@@ -562,25 +503,6 @@ export const handleWebhook = async (event) => {
     }
 
     const orderConfirmed = await confirmOrderPayment(updatedPayment, tx);
-
-    if (currentPayment.paymentType === "TRAINING_REGISTRATION") {
-      if (currentPayment.trainingEnrollmentId) {
-        await tx.trainingEnrollment.update({
-          where: {
-            id: currentPayment.trainingEnrollmentId,
-          },
-          data: {
-            status: "PAID",
-            paidAt: new Date(),
-          },
-        });
-      }
-
-      return {
-        payment: updatedPayment,
-        orderConfirmed: false,
-      };
-    }
 
     return {
       payment: orderConfirmed.payment,

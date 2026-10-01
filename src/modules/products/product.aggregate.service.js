@@ -1,4 +1,3 @@
-// modules/products/product.aggregate.service.js
 import { prisma } from "../../config/prisma.js";
 import {
   BadRequestError,
@@ -268,7 +267,7 @@ export const createProductAggregate = async (payload) => {
     ...variant,
     media: {
       create: getVariantImages(incomingVariants[index], variantImages).map(
-        (img) => ({
+        (img, imageIndex) => ({
           url: img.url,
           publicId: img.publicId,
           mimeType: img.mimeType,
@@ -276,7 +275,9 @@ export const createProductAggregate = async (payload) => {
           format: img.format,
           width: img.width,
           height: img.height,
-          isPrimary: true,
+          // Only the first image is the cover; the rest keep upload order.
+          isPrimary: imageIndex === 0,
+          sortOrder: imageIndex,
         }),
       ),
     },
@@ -408,10 +409,15 @@ export const updateProductAggregate = async (id, payload) => {
     ...productData
   } = data;
 
-  // Simple path: no variant changes
-  if (!Array.isArray(incomingVariants)) {
+  // Simple path: no variant changes.
+  // An empty array is NOT a valid "sync" payload: a product must keep at
+  // least one variant (createProductSchema enforces min(1)), and treating
+  // `[]` as "delete everything" is how a plain product save used to wipe
+  // all of its variants. Only a non-empty array triggers variant sync.
+  if (!Array.isArray(incomingVariants) || incomingVariants.length === 0) {
     await productDb.updateProductScalars(id, productData);
-    return productDb.findProductById(id);
+    // Admin read: includes inactive variants, matching GET /admin/products/:id.
+    return productDb.findProductByIdForAdmin(id);
   }
 
   // Load ALL variants (active + inactive) for classification. productDetailInclude
@@ -464,7 +470,7 @@ export const updateProductAggregate = async (id, payload) => {
     }
   }
 
-  return productDb.findProductById(id);
+  return productDb.findProductByIdForAdmin(id);
 };
 
 // ============================================================================
@@ -524,6 +530,6 @@ export const updateProductStatusAggregate = async (id, status) => {
 
   return prisma.$transaction(async (tx) => {
     await productDb.updateProductStatus(id, status, tx);
-    return productDb.findProductById(id, tx);
+    return productDb.findProductByIdForAdmin(id, tx);
   });
 };
