@@ -12,7 +12,7 @@ import webhookRouter from "./webhook/webhook.routes.js";
 import collectionRouter from "./modules/collections/collection.routes.js";
 import organisationRouter from "./modules/organization/organisation.routes.js";
 import cartRouter from "./modules/cart/cart.routes.js";
-import fulfillmentRouter from "./modules/fulfillment/fulfillment.routes.js"
+import fulfillmentRouter from "./modules/fulfillment/fulfillment.routes.js";
 import notificationRouter from "./modules/notifications/notification.routes.js";
 import categoryRouter from "./modules/categories/category.routes.js";
 import configRouter from "./modules/business-config/businessConfig.routes.js";
@@ -21,8 +21,6 @@ import brandRouter from "./modules/brands/brand.routes.js";
 import adminRouter from "./modules/admin/admin.routes.js";
 import testimonialRouter from "./modules/testimonials/testimonialRoutes.js";
 import authRouter from "./modules/auth/auth.routes.js";
-import trainingRouter from "./modules/training-programs/trainingProgram.routes.js";
-import registrationRouter from "./modules/registration/registration.routes.js";
 import auditRouter from "./modules/audit/audit.routes.js";
 import productRouter from "./modules/products/product.routes.js";
 import shippingRouter from "./modules/shipping/shipping.routes.js";
@@ -44,24 +42,36 @@ export const app = express();
 app.use("/api/webhooks", webhookRouter);
 
 // ── CORS ──
-// Normalize helper: strips a single trailing slash so
-// "https://foo.com/" and "https://foo.com" are treated as equal.
+
 const normalizeOrigin = (url) =>
-  typeof url === "string" ? url.trim().replace(/\/+$/, "") : url;
+  typeof url === "string"
+    ? url.trim().replace(/\/+$/, "")
+    : url;
+
+const configuredOrigins = (env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map(normalizeOrigin)
+  .filter(Boolean);
 
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+
+  // Production frontends
   "https://atc-shopping.vercel.app",
   "https://keplexregistration.vercel.app",
-  env.FRONTEND_URL,
-]
-  .filter(Boolean)
-  .map(normalizeOrigin);
 
-// Optional: allow any Vercel *preview* deployment for these projects too,
-// e.g. atc-shopping-git-branchname-yourteam.vercel.app
-// Comment this out if you don't want preview URLs auto-allowed.
+  // Existing single frontend variable
+  env.FRONTEND_URL,
+
+  // Additional origins from environment
+  ...configuredOrigins,
+]
+  .map(normalizeOrigin)
+  .filter(Boolean)
+  .filter((origin, index, array) => array.indexOf(origin) === index);
+
+// Optional: allow Vercel preview deployments.
 const allowedVercelPreviewPatterns = [
   /^https:\/\/atc-shopping-[a-z0-9-]+\.vercel\.app$/,
   /^https:\/\/keplexregistration-[a-z0-9-]+\.vercel\.app$/,
@@ -70,12 +80,16 @@ const allowedVercelPreviewPatterns = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // No origin (server-to-server, curl, mobile apps, Postman) — allow.
-      if (!origin) return callback(null, true);
+      // Requests without an Origin header:
+      // curl, Postman, server-to-server requests, etc.
+      if (!origin) {
+        return callback(null, true);
+      }
 
       const normalized = normalizeOrigin(origin);
 
       const isExactMatch = allowedOrigins.includes(normalized);
+
       const isPreviewMatch = allowedVercelPreviewPatterns.some((re) =>
         re.test(normalized),
       );
@@ -84,15 +98,15 @@ app.use(
         return callback(null, true);
       }
 
-      // Log the RAW origin with JSON.stringify so invisible characters,
-      // stray whitespace, or trailing slashes show up in the logs.
       console.error(
-        `[CORS Blocked] raw origin: ${JSON.stringify(origin)} | normalized: ${JSON.stringify(
-          normalized,
-        )} | allowedOrigins: ${JSON.stringify(allowedOrigins)}`,
+        `[CORS Blocked] raw origin: ${JSON.stringify(origin)} | ` +
+          `normalized: ${JSON.stringify(normalized)} | ` +
+          `allowedOrigins: ${JSON.stringify(allowedOrigins)}`,
       );
-      callback(new Error("Not allowed by CORS"));
+
+      return callback(new Error("Not allowed by CORS"));
     },
+
     credentials: true,
   }),
 );
@@ -127,8 +141,6 @@ app.use("/api/audit", auditRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/brands", brandRouter);
 app.use("/api/collections", collectionRouter);
-app.use("/api/registrations", registrationRouter);
-app.use("/api/training-programs", trainingRouter);
 app.use("/api/business-config", configRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/testimonial", testimonialRouter);
@@ -138,7 +150,7 @@ app.use("/api/products", productRouter);
 app.use("/api/variants", variantRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/shipping", shippingRouter);
-app.use("/api/warehouses", warehouseRouter)
+app.use("/api/warehouses", warehouseRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/storefront", storefrontRouter);
 
