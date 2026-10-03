@@ -269,6 +269,244 @@ export const createOrderFromCart = async (
 };
 
 // ============================================================
+// FLEXPAY ORDER CREATE
+// ============================================================
+
+export const createOrderFromInstallmentPlan = async (
+  {
+    userId,
+    payload,
+    address,
+    plan,
+    totalAmount,
+    shippingCost,
+    taxAmount,
+    itemsWithCBM,
+  },
+  tx = prisma,
+) => {
+  const subtotal = plan.items.reduce(
+    (sum, item) =>
+      sum +
+      Number(item.unitPrice) *
+        Number(item.quantity),
+
+    0,
+  );
+
+  const calculatedItems =
+    Array.isArray(itemsWithCBM)
+      ? itemsWithCBM
+      : [];
+
+  const totalCBM =
+    calculatedItems.reduce(
+      (sum, item) =>
+        sum + Number(item.cbm || 0),
+
+      0,
+    );
+
+  const totalChargeableWeight =
+    calculatedItems.reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item.chargeableWeight || 0,
+        ),
+
+      0,
+    );
+
+  const normalizedCBM =
+    Number(totalCBM.toFixed(4));
+
+  const normalizedChargeableWeight =
+    Number(
+      totalChargeableWeight.toFixed(2),
+    );
+
+  return tx.order.create({
+    data: {
+      userId,
+
+      orderNumber:
+        generateOrderNumber(),
+
+      customerName:
+        address.fullName,
+
+      customerEmail:
+        address.email || null,
+
+      customerPhone:
+        address.phone,
+
+      shippingLabel:
+        address.label || null,
+
+      shippingStreet:
+        address.addressLine,
+
+      shippingCity:
+        address.city,
+
+      shippingState:
+        address.state || null,
+
+      shippingCountry:
+        address.country || "NG",
+
+      subtotal,
+
+      shippingCost:
+        Number(shippingCost || 0),
+
+      taxAmount:
+        Number(taxAmount || 0),
+
+      totalAmount:
+        Number(totalAmount),
+
+      status: "PENDING",
+
+      notes:
+        payload.notes || null,
+
+      cbm:
+        normalizedCBM,
+
+      chargeableWeight:
+        normalizedChargeableWeight,
+
+      cbmData: {
+        totalCBM:
+          normalizedCBM,
+
+        totalChargeableWeight:
+          normalizedChargeableWeight,
+
+        items:
+          calculatedItems.map(
+            (item) => ({
+              variantId:
+                item.variantId,
+
+              quantity:
+                Number(
+                  item.quantity || 0,
+                ),
+
+              cbm:
+                Number(
+                  item.cbm || 0,
+                ),
+
+              actualWeight:
+                Number(
+                  item.actualWeight ||
+                    0,
+                ),
+
+              volumetricWeight:
+                Number(
+                  item.volumetricWeight ||
+                    0,
+                ),
+
+              chargeableWeight:
+                Number(
+                  item.chargeableWeight ||
+                    0,
+                ),
+
+              shippingType:
+                item.shippingType ||
+                "LOCAL",
+
+              dimensions: {
+                length:
+                  item.length !=
+                  null
+                    ? Number(
+                        item.length,
+                      )
+                    : null,
+
+                width:
+                  item.width !=
+                  null
+                    ? Number(
+                        item.width,
+                      )
+                    : null,
+
+                height:
+                  item.height !=
+                  null
+                    ? Number(
+                        item.height,
+                      )
+                    : null,
+              },
+            }),
+          ),
+      },
+
+      fulfillmentGroups:
+        payload.fulfillmentGroups ||
+        null,
+
+      items: {
+        create:
+          plan.items.map(
+            (planItem) => {
+              const itemCBM =
+                calculatedItems.find(
+                  (item) =>
+                    item.variantId ===
+                    planItem.variantId,
+                );
+
+              return {
+                variantId:
+                  planItem.variantId,
+
+                quantity:
+                  Number(
+                    planItem.quantity,
+                  ),
+
+                unitPriceSnapshot:
+                  planItem.unitPrice,
+
+                totalPrice:
+                  Number(
+                    planItem.unitPrice,
+                  ) *
+                  Number(
+                    planItem.quantity,
+                  ),
+
+                cbm:
+                  Number(
+                    itemCBM?.cbm || 0,
+                  ),
+
+                chargeableWeight:
+                  Number(
+                    itemCBM?.chargeableWeight ||
+                      0,
+                  ),
+              };
+            },
+          ),
+      },
+    },
+  });
+};
+
+// ============================================================
 // ORDERS LIST
 // ============================================================
 

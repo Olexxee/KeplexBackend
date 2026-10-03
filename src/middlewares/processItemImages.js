@@ -1,4 +1,3 @@
-// middlewares/processMedia.js
 import { uploadBufferToCloudinary } from "../config/cloudinaryService.js";
 
 /**
@@ -147,5 +146,50 @@ export const processSingleImage = (folder = "keplex/general") => {
   };
 };
 
-import { BadRequestError } from "../classes/errorClasses.js";
+/**
+ * Process sourcing reference images
+ *
+ * Expects req.files from uploadSourcingImages
+ * Attaches processed images to req.body.referenceImages
+ */
+/**
+ * Process sourcing reference images
+ *
+ * Expects req.files from uploadSourcingImages
+ * Attaches processed images to req.body.referenceImages
+ */
+export const processSourcingImages = async (req, res, next) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      req.body.referenceImages = [];
+      return next();
+    }
+
+    const uploadPromises = req.files.map(async (file) => {
+      const result = await uploadBufferToCloudinary(file.buffer, {
+        folder: "keplex/sourcing",
+        resource_type: "image",
+      });
+
+      return {
+        url: result.url,
+        publicId: result.publicId,
+        mimeType: file.mimetype,
+        bytes: result.bytes,
+        format: result.format,
+        width: result.width,
+        height: result.height,
+      };
+    });
+
+    const uploadedImages = await Promise.all(uploadPromises);
+
+    req.body.referenceImages = uploadedImages;
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
 

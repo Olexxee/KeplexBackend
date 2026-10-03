@@ -1,35 +1,43 @@
 import * as paystack from "./paymentGateway/paystack.js";
-import * as pawapay from "./paymentGateway/pawapay.js";
 import * as paymentDb from "./payment.db.js";
+import * as installmentService from "../installment/installment.service.js";
 import { BadRequestError, NotFoundError } from "../../classes/errorClasses.js";
-
 import { prisma } from "../../config/prisma.js";
 import { orderQueue } from "../../jobs/queues/order.queue.js";
 
-// ============================================================
-// CONSTANTS
-// ============================================================
 
-const PAYMENT_PROVIDERS = {
-  PAYSTACK: "PAYSTACK",
-  PAWAPAY: "PAWAPAY",
-};
+const PAYMENT_PROVIDER = "PAYSTACK";
 
-const PAYMENT_FINAL_STATUSES = ["SUCCESS", "FAILED", "REVERSED"];
-const PAWAPAY_CURRENCY = process.env.PAWAPAY_CURRENCY || "NGN";
-const PAWAPAY_PROVIDER = process.env.PAWAPAY_PROVIDER || null;
+const PAYMENT_FINAL_STATUSES = ["SUCCESS", "FAILED", "ABANDONED", "REVERSED"];
 
 const isFinalPaymentStatus = (status) =>
   PAYMENT_FINAL_STATUSES.includes(status);
 
-// ============================================================
-// ORDER PAYMENT
-// ============================================================
+const toKobo = (amount) => {
+  const value = Number(amount);
+
+  if (!Number.isFinite(value)) {
+    throw new BadRequestError("Invalid payment amount");
+  }
+
+  return Math.round(value * 100);
+};
+
+const assertPaymentAmount = ({ providerAmount, expectedAmount, reference }) => {
+  const actualKobo = toKobo(providerAmount);
+  const expectedKobo = toKobo(expectedAmount);
+
+  if (actualKobo !== expectedKobo) {
+    throw new BadRequestError(
+      `Payment amount mismatch for reference ${reference}`,
+    );
+  }
+};
 
 export const initializePayment = async ({
   order,
   user,
-  provider = PAYMENT_PROVIDERS.PAYSTACK,
+  provider = PAYMENT_PROVIDER,
   paymentData = {},
 }) => {
   if (!order) {
@@ -41,6 +49,7 @@ export const initializePayment = async ({
   }
 
   const isOwner = order.userId === user.id;
+
   const isAdmin = ["SUPER_ADMIN", "ADMIN", "STAFF"].includes(user.role);
 
   if (!isOwner && !isAdmin) {
@@ -53,29 +62,21 @@ export const initializePayment = async ({
 
   const normalizedProvider = String(provider).toUpperCase();
 
-  if (!Object.values(PAYMENT_PROVIDERS).includes(normalizedProvider)) {
+  if (normalizedProvider !== PAYMENT_PROVIDER) {
     throw new BadRequestError(`Unsupported payment provider: ${provider}`);
   }
 
   const existing = order.payments?.find(
     (payment) =>
-      payment.provider === normalizedProvider && payment.status === "PENDING",
+      payment.provider === PAYMENT_PROVIDER && payment.status === "PENDING",
   );
 
   if (existing) {
     return existing;
   }
 
-  if (normalizedProvider === PAYMENT_PROVIDERS.PAWAPAY) {
-    return initializePawaPayOrderPayment({ order, paymentData });
-  }
-
   return initializePaystackOrderPayment({ order });
 };
-
-// ============================================================
-// PAYSTACK ORDER PAYMENT
-// ============================================================
 
 const initializePaystackOrderPayment = async ({ order }) => {
   const email = order.user?.email || order.customerEmail;
@@ -100,7 +101,7 @@ const initializePaystackOrderPayment = async ({ order }) => {
   return paymentDb.createPayment({
     orderId: order.id,
     paymentType: "ORDER_PAYMENT",
-    provider: PAYMENT_PROVIDERS.PAYSTACK,
+    provider: PAYMENT_PROVIDER,
     reference,
     providerReference: null,
     amount: order.totalAmount,
@@ -112,75 +113,6 @@ const initializePaystackOrderPayment = async ({ order }) => {
   });
 };
 
-// ============================================================
-// PAWAPAY ORDER PAYMENT
-// ============================================================
-
-const initializePawaPayOrderPayment = async ({ order, paymentData }) => {
-  const phoneNumber =
-    paymentData.phoneNumber || order.customerPhone || order.user?.phone;
-
-  const provider = paymentData.provider || PAWAPAY_PROVIDER;
-
-  if (!phoneNumber) {
-    throw new BadRequestError("Mobile money phone number is required");
-  }
-
-  if (!provider) {
-    throw new BadRequestError("Mobile money provider is required");
-  }
-
-  const depositId = pawapay.generateDepositId();
-  const reference = paystack.generateReference("KPX-ORDER");
-  const customerMessage =
-    paymentData.customerMessage || `Order ${order.orderNumber}`;
-
-  if (customerMessage.length < 4 || customerMessage.length > 22) {
-    throw new BadRequestError(
-      "pawaPay customer message must be between 4 and 22 characters",
-    );
-  }
-
-  const init = await pawapay.initializeDeposit({
-    depositId,
-    amount: order.totalAmount,
-    currency: PAWAPAY_CURRENCY,
-    phoneNumber,
-    provider,
-    clientReferenceId: reference,
-    customerMessage,
-    metadata: [
-      { orderId: order.id },
-      ...(order.userId ? [{ customerId: order.userId }] : []),
-    ],
-  });
-
-  if (!["ACCEPTED", "DUPLICATE_IGNORED"].includes(init.status)) {
-    throw new BadRequestError(
-      init.rejectionReason?.rejectionMessage ||
-        `pawaPay rejected the payment request with status ${init.status}`,
-    );
-  }
-
-  return paymentDb.createPayment({
-    orderId: order.id,
-    paymentType: "ORDER_PAYMENT",
-    provider: PAYMENT_PROVIDERS.PAWAPAY,
-    reference,
-    providerReference: depositId,
-    amount: order.totalAmount,
-    currency: PAWAPAY_CURRENCY,
-    status: "PENDING",
-    authorizationUrl: null,
-    accessCode: null,
-    providerPayload: init.raw,
-  });
-};
-
-// ============================================================
-// VERIFY PAYMENT
-// ============================================================
-
 export const verifyPayment = async (reference) => {
   const payment = await paymentDb.findPaymentByReference(reference);
 
@@ -188,38 +120,79 @@ export const verifyPayment = async (reference) => {
     throw new NotFoundError("Payment not found");
   }
 
-  if (isFinalPaymentStatus(payment.status)) {
-    return payment;
-  }
-
-  if (payment.provider === PAYMENT_PROVIDERS.PAWAPAY) {
-    return verifyPawaPayPayment(payment);
+  if (payment.paymentType === "INSTALLMENT_PAYMENT") {
+    return verifyInstallmentPayment(reference);
   }
 
   return verifyPaystackPayment(reference);
 };
 
-// ============================================================
-// PAYSTACK VERIFICATION
-// ============================================================
+const verifyInstallmentPayment = async (reference) => {
+  const verification = await paystack.verifyTransaction(reference);
+
+  const payment = await paymentDb.findPaymentByReference(reference);
+
+  if (!payment) {
+    throw new NotFoundError("Payment not found");
+  }
+
+  assertPaymentAmount({
+    providerAmount: verification.amount,
+    expectedAmount: payment.amount,
+    reference,
+  });
+
+  if (verification.status !== "SUCCESS") {
+    if (isFinalPaymentStatus(payment.status)) {
+      return payment;
+    }
+
+    return paymentDb.updatePaymentByReference(reference, {
+      status: verification.status,
+      providerPayload: verification.raw,
+    });
+  }
+
+  return installmentService.processSuccessfulPayment({
+    reference,
+    providerPayload: verification.raw,
+  });
+};
 
 const verifyPaystackPayment = async (reference) => {
   const verification = await paystack.verifyTransaction(reference);
-  const status = verification.status;
 
   const result = await prisma.$transaction(async (tx) => {
-    const currentPayment = await paymentDb.findPaymentByReference(
-      reference,
-      tx,
-    );
+    const payment = await paymentDb.findPaymentByReference(reference, tx);
 
-    if (!currentPayment) {
+    if (!payment) {
       throw new NotFoundError("Payment not found");
     }
 
-    if (isFinalPaymentStatus(currentPayment.status)) {
+    assertPaymentAmount({
+      providerAmount: verification.amount,
+      expectedAmount: payment.amount,
+      reference,
+    });
+
+    /*
+     * A payment can already be SUCCESS while the downstream
+     * order confirmation was interrupted.
+     *
+     * Therefore SUCCESS does NOT mean we can immediately return.
+     */
+    if (payment.status === "SUCCESS") {
+      const reconciled = await reconcileSuccessfulOrderPayment(payment, tx);
+
       return {
-        payment: currentPayment,
+        payment: reconciled.payment,
+        orderConfirmed: reconciled.orderConfirmed,
+      };
+    }
+
+    if (isFinalPaymentStatus(payment.status)) {
+      return {
+        payment,
         orderConfirmed: false,
       };
     }
@@ -227,181 +200,32 @@ const verifyPaystackPayment = async (reference) => {
     const updatedPayment = await paymentDb.updatePaymentByReference(
       reference,
       {
-        status,
+        status: verification.status,
         providerPayload: verification.raw,
       },
       tx,
     );
 
-    if (status !== "SUCCESS") {
+    if (verification.status !== "SUCCESS") {
       return {
         payment: updatedPayment,
         orderConfirmed: false,
       };
     }
 
-    const orderConfirmed = await confirmOrderPayment(updatedPayment, tx);
-
-    return {
-      payment: orderConfirmed.payment,
-      orderConfirmed: orderConfirmed.orderConfirmed,
-    };
+    return reconcileSuccessfulOrderPayment(updatedPayment, tx);
   });
 
   if (result.orderConfirmed) {
-    await queueOrderPaymentConfirmed({ payment: result.payment });
+    await queueOrderPaymentConfirmed({
+      payment: result.payment,
+    });
   }
 
   return result.payment;
 };
 
-// ============================================================
-// PAWAPAY VERIFICATION
-// ============================================================
-
-const verifyPawaPayPayment = async (payment) => {
-  if (!payment.providerReference) {
-    throw new BadRequestError("pawaPay deposit reference is missing");
-  }
-
-  const verification = await pawapay.getDepositStatus(
-    payment.providerReference,
-  );
-
-  if (verification.status !== "FOUND") {
-    throw new BadRequestError("pawaPay deposit could not be found");
-  }
-
-  const deposit = verification.data;
-
-  if (!deposit) {
-    throw new BadRequestError("pawaPay deposit details are missing");
-  }
-
-  const result = await applyPawaPayStatus(payment.providerReference, deposit);
-
-  if (result.orderConfirmed) {
-    await queueOrderPaymentConfirmed({ payment: result.payment });
-  }
-
-  return result.payment;
-};
-
-// ============================================================
-// PAWAPAY CALLBACK
-// ============================================================
-
-export const handlePawaPayCallback = async (payload) => {
-  const depositId = payload?.depositId;
-
-  if (!depositId) {
-    throw new BadRequestError("pawaPay callback depositId is required");
-  }
-
-  const verification = await pawapay.getDepositStatus(depositId);
-
-  if (verification.status !== "FOUND") {
-    throw new BadRequestError("pawaPay deposit could not be verified");
-  }
-
-  const deposit = verification.data;
-
-  if (!deposit) {
-    throw new BadRequestError("pawaPay deposit details are missing");
-  }
-
-  const payment = await paymentDb.findPaymentByProviderReference(depositId);
-
-  if (!payment) {
-    console.warn(`[PAWAPAY CALLBACK] Unknown deposit: ${depositId}`);
-    return null;
-  }
-
-  if (
-    deposit.clientReferenceId &&
-    deposit.clientReferenceId !== payment.reference
-  ) {
-    throw new BadRequestError("pawaPay payment reference mismatch");
-  }
-
-  const result = await applyPawaPayStatus(depositId, deposit);
-
-  if (result.orderConfirmed) {
-    await queueOrderPaymentConfirmed({ payment: result.payment });
-  }
-
-  return result.payment;
-};
-
-// ============================================================
-// APPLY PAWAPAY STATUS
-// ============================================================
-
-const applyPawaPayStatus = async (depositId, deposit) => {
-  const normalizedStatus = normalizePawaPayStatus(deposit.status);
-
-  return prisma.$transaction(async (tx) => {
-    const currentPayment = await paymentDb.findPaymentByProviderReference(
-      depositId,
-      tx,
-    );
-
-    if (!currentPayment) {
-      throw new NotFoundError("Payment not found");
-    }
-
-    if (isFinalPaymentStatus(currentPayment.status)) {
-      return {
-        payment: currentPayment,
-        orderConfirmed: false,
-      };
-    }
-
-    const updatedPayment = await paymentDb.updatePaymentByProviderReference(
-      depositId,
-      {
-        status: normalizedStatus,
-        providerPayload: deposit,
-      },
-      tx,
-    );
-
-    if (normalizedStatus !== "SUCCESS") {
-      return {
-        payment: updatedPayment,
-        orderConfirmed: false,
-      };
-    }
-
-    const orderConfirmed = await confirmOrderPayment(updatedPayment, tx);
-
-    return {
-      payment: orderConfirmed.payment,
-      orderConfirmed: orderConfirmed.orderConfirmed,
-    };
-  });
-};
-
-// ============================================================
-// STATUS NORMALIZATION
-// ============================================================
-
-const normalizePawaPayStatus = (status) => {
-  switch (String(status).toUpperCase()) {
-    case "COMPLETED":
-      return "SUCCESS";
-    case "FAILED":
-      return "FAILED";
-    default:
-      return "PENDING";
-  }
-};
-
-// ============================================================
-// ORDER CONFIRMATION
-// ============================================================
-
-const confirmOrderPayment = async (payment, tx) => {
+const reconcileSuccessfulOrderPayment = async (payment, tx) => {
   if (payment.paymentType !== "ORDER_PAYMENT") {
     return {
       payment,
@@ -409,34 +233,77 @@ const confirmOrderPayment = async (payment, tx) => {
     };
   }
 
-  if (!payment.orderId || payment.order?.status !== "PENDING") {
+  if (!payment.orderId) {
     return {
       payment,
       orderConfirmed: false,
     };
   }
 
-  const order = await tx.order.update({
+  const order = await tx.order.findUnique({
     where: {
       id: payment.orderId,
     },
-    data: {
-      status: "CONFIRMED",
-    },
   });
 
+  if (!order) {
+    return {
+      payment,
+      orderConfirmed: false,
+    };
+  }
+
+  if (order.status === "PENDING") {
+    const confirmedOrder = await tx.order.update({
+      where: {
+        id: order.id,
+      },
+      data: {
+        status: "CONFIRMED",
+      },
+    });
+
+    return {
+      payment: {
+        ...payment,
+        order: confirmedOrder,
+      },
+      orderConfirmed: true,
+    };
+  }
+
+  /*
+   * Already confirmed means the payment has been successfully
+   * reconciled. Do nothing.
+   */
+  if (
+    order.status === "CONFIRMED" ||
+    order.status === "PROCESSING" ||
+    order.status === "SHIPPED" ||
+    order.status === "DELIVERED" ||
+    order.status === "COMPLETED"
+  ) {
+    return {
+      payment: {
+        ...payment,
+        order,
+      },
+      orderConfirmed: false,
+    };
+  }
+
+  /*
+   * Cancelled orders must not be resurrected by a payment
+   * verification request.
+   */
   return {
     payment: {
       ...payment,
       order,
     },
-    orderConfirmed: true,
+    orderConfirmed: false,
   };
 };
-
-// ============================================================
-// PAYSTACK WEBHOOK
-// ============================================================
 
 export const handleWebhook = async (event) => {
   if (!event?.event) {
@@ -456,15 +323,23 @@ export const handleWebhook = async (event) => {
   const payment = await paymentDb.findPaymentByReference(reference);
 
   if (!payment) {
-    console.warn(`[PAYSTACK WEBHOOK] Unknown payment reference: ${reference}`);
-    return;
+    throw new NotFoundError("Payment not found");
   }
 
-  if (payment.status === "SUCCESS") {
-    return;
+  if (payment.paymentType === "INSTALLMENT_PAYMENT") {
+    return installmentService.processSuccessfulPayment({
+      reference,
+      providerPayload: event,
+    });
   }
 
-  const status = paystack.mapStatus(event.data?.status);
+  const providerAmount = Number(event.data?.amount) / 100;
+
+  assertPaymentAmount({
+    providerAmount,
+    expectedAmount: payment.amount,
+    reference,
+  });
 
   const result = await prisma.$transaction(async (tx) => {
     const currentPayment = await paymentDb.findPaymentByReference(
@@ -480,6 +355,10 @@ export const handleWebhook = async (event) => {
     }
 
     if (currentPayment.status === "SUCCESS") {
+      return reconcileSuccessfulOrderPayment(currentPayment, tx);
+    }
+
+    if (isFinalPaymentStatus(currentPayment.status)) {
       return {
         payment: currentPayment,
         orderConfirmed: false,
@@ -489,37 +368,23 @@ export const handleWebhook = async (event) => {
     const updatedPayment = await paymentDb.updatePaymentByReference(
       reference,
       {
-        status,
+        status: "SUCCESS",
         providerPayload: event,
       },
       tx,
     );
 
-    if (status !== "SUCCESS") {
-      return {
-        payment: updatedPayment,
-        orderConfirmed: false,
-      };
-    }
-
-    const orderConfirmed = await confirmOrderPayment(updatedPayment, tx);
-
-    return {
-      payment: orderConfirmed.payment,
-      orderConfirmed: orderConfirmed.orderConfirmed,
-    };
+    return reconcileSuccessfulOrderPayment(updatedPayment, tx);
   });
 
   if (result.orderConfirmed) {
-    await queueOrderPaymentConfirmed({ payment: result.payment });
+    await queueOrderPaymentConfirmed({
+      payment: result.payment,
+    });
   }
 
   return result.payment;
 };
-
-// ============================================================
-// ORDER PAYMENT → BACKGROUND PROCESSING
-// ============================================================
 
 const queueOrderPaymentConfirmed = async ({ payment }) => {
   if (!payment?.orderId) {
@@ -537,7 +402,9 @@ const queueOrderPaymentConfirmed = async ({ payment }) => {
         reference: payment.reference,
         userId: payment.order?.userId ?? null,
       },
-      { jobId },
+      {
+        jobId,
+      },
     );
 
     console.log("[PAYMENT] Order payment confirmation queued:", {
@@ -553,6 +420,7 @@ const queueOrderPaymentConfirmed = async ({ payment }) => {
       reference: payment.reference,
       error,
     });
+
     return null;
   }
 };

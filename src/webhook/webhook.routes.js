@@ -4,7 +4,7 @@ import { paystackWebhook } from "./webhook.controller.js";
 const webhookRouter = express.Router();
 
 webhookRouter.post(
-  "/webhook/paystack",
+  "/paystack",
   express.raw({ type: "application/json" }),
   paystackWebhook,
 );
