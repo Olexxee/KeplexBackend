@@ -31,6 +31,9 @@ import warehouseRouter from "./modules/warehouse/warehouse.routes.js";
 import storefrontRouter from "./modules/storefront/storefront.router.js";
 import productAdminRouter from "./modules/products/product.admin.routes.js";
 import variantAdminRouter from "./modules/variants/variant.admin.routes.js";
+import installmentRouter from "./modules/installment/installment.routes.js";
+import sourcingRouter from "./modules/sourcing/sourcing.routes.js";
+import adminInstallmentRouter from "./modules/admin/installments/adminInstallment.routes.js";
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
@@ -153,6 +156,9 @@ app.use("/api/shipping", shippingRouter);
 app.use("/api/warehouses", warehouseRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/storefront", storefrontRouter);
+app.use("/api/installments", installmentRouter);
+app.use("/api/sourcing", sourcingRouter);
+app.use("/api/admin/installments", adminInstallmentRouter);
 
 // ── 404 handler ──
 app.use((req, res, next) => {

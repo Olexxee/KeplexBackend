@@ -7,8 +7,15 @@ export const createPayment = (data, tx = prisma) =>
 
 export const findPaymentByReference = (reference, tx = prisma) =>
   tx.payment.findUnique({
-    where: { reference },
-    include: { order: true },
+    where: {
+      reference,
+    },
+
+    include: {
+      order: true,
+
+      installmentPlan: true,
+    },
   });
 
 export const findPaymentByProviderReference = (
@@ -16,15 +23,30 @@ export const findPaymentByProviderReference = (
   tx = prisma,
 ) =>
   tx.payment.findUnique({
-    where: { providerReference },
-    include: { order: true },
+    where: {
+      providerReference,
+    },
+
+    include: {
+      order: true,
+
+      installmentPlan: true,
+    },
   });
 
 export const updatePaymentByReference = (reference, data, tx = prisma) =>
   tx.payment.update({
-    where: { reference },
+    where: {
+      reference,
+    },
+
     data,
-    include: { order: true },
+
+    include: {
+      order: true,
+
+      installmentPlan: true,
+    },
   });
 
 export const updatePaymentByProviderReference = (
@@ -33,7 +55,28 @@ export const updatePaymentByProviderReference = (
   tx = prisma,
 ) =>
   tx.payment.update({
-    where: { providerReference },
+    where: {
+      providerReference,
+    },
+
     data,
-    include: { order: true },
+
+    include: {
+      order: true,
+
+      installmentPlan: true,
+    },
+  });
+
+export const findPaymentForUpdate = (reference, tx = prisma) =>
+  tx.payment.findUnique({
+    where: {
+      reference,
+    },
+
+    include: {
+      order: true,
+
+      installmentPlan: true,
+    },
   });

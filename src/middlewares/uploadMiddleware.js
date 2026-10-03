@@ -33,18 +33,26 @@ export const upload = multer({
 // Single image upload
 export const uploadSingleImage = upload.single("image");
 
-// Multiple images upload.
-// Cap is *per request*, not per resource: a multi-variant product create
-// flattens every variant's files into a single array, so this needs to
-// cover the whole payload.
+// Multiple images upload
 export const uploadMultipleImages = upload.array("images", 20);
 
-// Variant images upload — same reasoning. 20 covers e.g. 4 variants x 5
-// images each; raise if you allow more images per variant than that.
-export const uploadVariantImages = upload.array("variantImages", 20);
+// Variant images upload
+export const uploadVariantImages = upload.array(
+  "variantImages",
+  20,
+);
 
 // Product hero image upload
 export const uploadHeroImage = upload.single("heroImage");
 
-// Review images — capped tighter; reviews rarely need many.
-export const uploadReviewImages = upload.array("reviewImages", 5);
+// Review images
+export const uploadReviewImages = upload.array(
+  "reviewImages",
+  5,
+);
+
+// Sourcing reference images
+export const uploadSourcingImages = upload.array(
+  "referenceImages",
+  5,
+);
