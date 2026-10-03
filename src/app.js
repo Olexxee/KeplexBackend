@@ -34,6 +34,7 @@ import variantAdminRouter from "./modules/variants/variant.admin.routes.js";
 import installmentRouter from "./modules/installment/installment.routes.js";
 import sourcingRouter from "./modules/sourcing/sourcing.routes.js";
 import adminInstallmentRouter from "./modules/admin/installments/adminInstallment.routes.js";
+import smartshoppingRouter from "./modules/smartShopping/smartShopping.routes.js";
 import { env } from "./config/env.js";
 import { NotFoundError } from "./classes/errorClasses.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
@@ -159,6 +160,8 @@ app.use("/api/storefront", storefrontRouter);
 app.use("/api/installments", installmentRouter);
 app.use("/api/sourcing", sourcingRouter);
 app.use("/api/admin/installments", adminInstallmentRouter);
+app.use("/api/smart-shopping", smartshoppingRouter);
+
 
 // ── 404 handler ──
 app.use((req, res, next) => {
