@@ -382,6 +382,220 @@ export const findProductVariantsForClassification = (productId, tx = null) =>
     },
   });
 
+  // ============================================================================
+// SMART SHOPPING
+// ============================================================================
+
+export const findProductsForSmartShopping = async (
+  {
+    search,
+    category,
+    brand,
+    minPrice,
+    maxPrice,
+    take = 30,
+  } = {},
+  tx = null,
+) => {
+  const client = db(tx);
+
+  const normalizedSearch = String(search || "").trim();
+  const normalizedCategory = String(category || "").trim();
+  const normalizedBrand = String(brand || "").trim();
+
+  const where = {
+    status: "ACTIVE",
+
+    ...(normalizedCategory && {
+      category: {
+        name: {
+          contains: normalizedCategory,
+          mode: "insensitive",
+        },
+      },
+    }),
+
+    ...(normalizedBrand && {
+      brand: {
+        name: {
+          contains: normalizedBrand,
+          mode: "insensitive",
+        },
+      },
+    }),
+
+    variants: {
+      some: {
+        isActive: true,
+        stock: {
+          gt: 0,
+        },
+
+        ...(minPrice !== undefined || maxPrice !== undefined
+          ? {
+              price: {
+                ...(minPrice !== undefined && {
+                  gte: minPrice,
+                }),
+                ...(maxPrice !== undefined && {
+                  lte: maxPrice,
+                }),
+              },
+            }
+          : {}),
+
+        ...(normalizedSearch
+          ? {
+              OR: [
+                {
+                  sku: {
+                    contains: normalizedSearch,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  color: {
+                    contains: normalizedSearch,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  size: {
+                    contains: normalizedSearch,
+                    mode: "insensitive",
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+    },
+
+    ...(normalizedSearch && {
+      OR: [
+        {
+          name: {
+            contains: normalizedSearch,
+            mode: "insensitive",
+          },
+        },
+        {
+          description: {
+            contains: normalizedSearch,
+            mode: "insensitive",
+          },
+        },
+        {
+          brand: {
+            name: {
+              contains: normalizedSearch,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          category: {
+            name: {
+              contains: normalizedSearch,
+              mode: "insensitive",
+            },
+          },
+        },
+      ],
+    }),
+  };
+
+  return client.product.findMany({
+    where,
+    take,
+    orderBy: [
+      { isBestSeller: "desc" },
+      { isFeatured: "desc" },
+      { createdAt: "desc" },
+    ],
+
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      isFeatured: true,
+      isNew: true,
+      isBestSeller: true,
+
+      brand: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+
+      variants: {
+        where: {
+          isActive: true,
+          stock: {
+            gt: 0,
+          },
+
+          ...(minPrice !== undefined || maxPrice !== undefined
+            ? {
+                price: {
+                  ...(minPrice !== undefined && {
+                    gte: minPrice,
+                  }),
+                  ...(maxPrice !== undefined && {
+                    lte: maxPrice,
+                  }),
+                },
+              }
+            : {}),
+        },
+
+        select: {
+          id: true,
+          sku: true,
+          color: true,
+          size: true,
+          price: true,
+          compareAtPrice: true,
+          stock: true,
+
+          fulfillmentType: true,
+          shippingType: true,
+
+          weight: true,
+          actualWeight: true,
+          length: true,
+          width: true,
+          height: true,
+
+          attributes: true,
+
+          media: {
+            orderBy: [
+              { isPrimary: "desc" },
+              { sortOrder: "asc" },
+            ],
+          },
+        },
+
+        orderBy: {
+          price: "asc",
+        },
+      },
+    },
+  });
+};
+
 // ============================================================================
 // PRODUCT REFERENCE LOOKUPS
 // ============================================================================
