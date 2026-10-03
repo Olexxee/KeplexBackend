@@ -52,7 +52,15 @@ const mapVariant = (variant) => {
     price: variant.price,
     stock: variant.stock,
     isActive: variant.isActive,
-    product: variant.product ?? null,
+
+    product: variant.product
+      ? {
+          id: variant.product.id,
+          name: variant.product.name,
+          slug: variant.product.slug,
+        }
+      : null,
+
     media: variant.media ?? [],
   };
 };
@@ -63,9 +71,9 @@ const mapVariant = (variant) => {
 
 export const toSourcingResponse = (response) => ({
   id: response.id,
-  message: response.message,
+  message: response.message ?? null,
   status: response.status,
-  expiresAt: response.expiresAt,
+  expiresAt: response.expiresAt ?? null,
 
   product: mapProduct(response.product),
   variant: mapVariant(response.variant),
@@ -75,42 +83,64 @@ export const toSourcingResponse = (response) => ({
 });
 
 /* ------------------------------------------------------------------ */
+/* Customer                                                           */
+/* ------------------------------------------------------------------ */
+
+const mapCustomer = (user) => {
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    name: user.fullName ?? null,
+    email: user.email ?? null,
+  };
+};
+
+/* ------------------------------------------------------------------ */
 /* Request                                                            */
 /* ------------------------------------------------------------------ */
 
-export const toSourcingRequest = (request) => {
-  const mapped = {
-    id: request.id,
-    requestNumber: request.requestNumber,
-    title: request.title,
-    description: request.description,
-    referenceUrl: request.referenceUrl,
-    referenceImages: request.referenceImages ?? [],
-    status: request.status,
-    aiAnalysis: request.aiAnalysis ?? null,
+export const toSourcingRequest = (request) => ({
+  id: request.id,
+  requestNumber: request.requestNumber,
 
-    responses: request.responses?.map(toSourcingResponse) ?? [],
+  title: request.title,
+  description: request.description ?? null,
+  referenceUrl: request.referenceUrl ?? null,
+  referenceImages: request.referenceImages ?? [],
 
-    createdAt: request.createdAt,
-    updatedAt: request.updatedAt,
-  };
+  status: request.status,
+  aiAnalysis: request.aiAnalysis ?? null,
 
-  /*
-   * `user` is only present on admin/detail views. Omit the key entirely
-   * (rather than set it to undefined) so internal callers that spread
-   * the result don't accidentally shadow a nested `user`.
-   */
-  if (request.user) {
-    mapped.user = {
-      id: request.user.id,
-      fullName: request.user.fullName,
-      email: request.user.email,
-      phone: request.user.phone,
-    };
-  }
+  responses: request.responses?.map(toSourcingResponse) ?? [],
 
-  return mapped;
-};
+  createdAt: request.createdAt,
+  updatedAt: request.updatedAt,
+});
+
+/* ------------------------------------------------------------------ */
+/* Admin Request                                                      */
+/* ------------------------------------------------------------------ */
+
+export const toAdminSourcingRequest = (request) => ({
+  id: request.id,
+  requestNumber: request.requestNumber,
+
+  title: request.title,
+  description: request.description ?? null,
+  referenceUrl: request.referenceUrl ?? null,
+  referenceImages: request.referenceImages ?? [],
+
+  status: request.status,
+  aiAnalysis: request.aiAnalysis ?? null,
+
+  customer: mapCustomer(request.user),
+
+  responses: request.responses?.map(toSourcingResponse) ?? [],
+
+  createdAt: request.createdAt,
+  updatedAt: request.updatedAt,
+});
 
 /* ------------------------------------------------------------------ */
 /* List helpers                                                       */
