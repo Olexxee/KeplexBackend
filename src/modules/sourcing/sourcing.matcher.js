@@ -114,5 +114,20 @@ export const findCatalogMatches = async (analysis) => {
 export const findBestCatalogMatch = async (analysis) => {
   const matches = await findCatalogMatches(analysis);
 
-  return matches[0] || null;
+  const bestMatch = matches[0];
+
+  if (!bestMatch) {
+    return null;
+  }
+
+  const product = await productDb.findProductById(bestMatch.product.id);
+
+  if (!product) {
+    return null;
+  }
+
+  return {
+    product,
+    score: bestMatch.score,
+  };
 };
