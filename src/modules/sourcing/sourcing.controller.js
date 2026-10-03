@@ -1,12 +1,12 @@
-import {asyncWrapper} from "../../lib/asyncWrapper.js";
+import { asyncWrapper } from "../../lib/asyncWrapper.js";
 import { successResponse } from "../../lib/response.js";
 import * as sourcingService from "./sourcing.service.js";
 import {
   toSourcingRequest,
   toSourcingRequestList,
   toSourcingResponse,
+  toAdminSourcingRequest,
 } from "./sourcing.mapper.js";
-
 
 /* ------------------------------------------------------------------ */
 /* Customer                                                           */
@@ -19,28 +19,28 @@ export const createSourcingRequest = asyncWrapper(async (req, res) => {
   );
 
   if (result.type === "CATALOG_MATCH") {
-    return successResponse(
+    return successResponse({
       res,
-      {
+      data: {
         type: result.type,
         analysis: result.analysis,
         match: result.match,
       },
-      "Matching product found",
-      201,
-    );
+      message: "Matching product found",
+      statusCode: 200,
+    });
   }
 
-  return successResponse(
+  return successResponse({
     res,
-    {
+    data: {
       type: result.type,
       analysis: result.analysis,
       request: toSourcingRequest(result.request),
     },
-    "Sourcing request created",
-    201,
-  );
+    message: "Sourcing request created",
+    statusCode: 201,
+  });
 });
 
 export const getMySourcingRequests = asyncWrapper(async (req, res) => {
@@ -49,11 +49,11 @@ export const getMySourcingRequests = asyncWrapper(async (req, res) => {
     req.query,
   );
 
-  return successResponse(
+  return successResponse({
     res,
-    toSourcingRequestList(result),
-    "Sourcing requests retrieved",
-  );
+    data: toSourcingRequestList(result),
+    message: "Sourcing requests retrieved",
+  });
 });
 
 export const getMySourcingRequest = asyncWrapper(async (req, res) => {
@@ -62,11 +62,11 @@ export const getMySourcingRequest = asyncWrapper(async (req, res) => {
     req.params.id,
   );
 
-  return successResponse(
+  return successResponse({
     res,
-    toSourcingRequest(request),
-    "Sourcing request retrieved",
-  );
+    data: toSourcingRequest(request),
+    message: "Sourcing request retrieved",
+  });
 });
 
 /* ------------------------------------------------------------------ */
@@ -76,46 +76,22 @@ export const getMySourcingRequest = asyncWrapper(async (req, res) => {
 export const getAdminSourcingRequest = asyncWrapper(async (req, res) => {
   const request = await sourcingService.getAdminSourcingRequest(req.params.id);
 
-  return successResponse(
+  return successResponse({
     res,
-    toAdminSourcingRequest(request),
-    "Sourcing request retrieved successfully",
-  );
-});
-
-export const findAdminSourcingRequestById = async (id, tx) => {
-  return db(tx).sourcingRequest.findUnique({
-    where: { id },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-
-      responses: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: responseInclude,
-      },
-    },
+    data: toAdminSourcingRequest(request),
+    message: "Sourcing request retrieved successfully",
   });
-};
+});
 
 export const getAdminSourcingRequests = asyncWrapper(async (req, res) => {
   const result = await sourcingService.getAdminSourcingRequests(req.query);
 
-  return successResponse(
+  return successResponse({
     res,
-    toSourcingRequestList(result),
-    "Sourcing requests retrieved",
-  );
+    data: toSourcingRequestList(result),
+    message: "Sourcing requests retrieved",
+  });
 });
-
-
 
 export const updateSourcingRequestStatus = asyncWrapper(async (req, res) => {
   const request = await sourcingService.updateSourcingRequestStatus(
@@ -123,11 +99,11 @@ export const updateSourcingRequestStatus = asyncWrapper(async (req, res) => {
     req.body.status,
   );
 
-  return successResponse(
+  return successResponse({
     res,
-    toSourcingRequest(request),
-    "Sourcing request status updated",
-  );
+    data: toSourcingRequest(request),
+    message: "Sourcing request status updated",
+  });
 });
 
 export const respondToSourcingRequest = asyncWrapper(async (req, res) => {
@@ -136,12 +112,12 @@ export const respondToSourcingRequest = asyncWrapper(async (req, res) => {
     req.body,
   );
 
-  return successResponse(
+  return successResponse({
     res,
-    toSourcingResponse(response),
-    "Sourcing response created",
-    201,
-  );
+    data: toSourcingResponse(response),
+    message: "Sourcing response created",
+    statusCode: 201,
+  });
 });
 
 export const updateSourcingResponseStatus = asyncWrapper(async (req, res) => {
@@ -150,9 +126,9 @@ export const updateSourcingResponseStatus = asyncWrapper(async (req, res) => {
     req.body.status,
   );
 
-  return successResponse(
+  return successResponse({
     res,
-    toSourcingResponse(response),
-    "Sourcing response status updated",
-  );
+    data: toSourcingResponse(response),
+    message: "Sourcing response status updated",
+  });
 });
